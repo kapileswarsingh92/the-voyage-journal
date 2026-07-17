@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}About — {{ site.name }}{% endblock %}
+
+{% block content %}
+<section class="page-header page-header-narrow">
+  <div class="wrap">
+    <p class="eyebrow">About the journal</p>
+    <h1>Slow travel stories, told by the people who lived them</h1>
+    <p class="page-header-sub">{{ site.name }} — {{ site.tagline }}.</p>
+  </div>
+</section>
+
+<section class="wrap section narrow prose">
+  <h3>Why this journal exists</h3>
+  <p>There was a time when travel meant a paper map folded into a jacket pocket, a notebook filling up with handwriting instead of hashtags, and long stretches of not knowing exactly where you'd end up next. No notifications pulling your attention from the view in front of you — just the place, the people, and whatever the day decided to bring. Strangers still stopped to help travellers find their way, simply because that's what you did.</p>
+  <p>Somewhere along the way, that got harder to find. The internet is full of travel advice now, but very little of it is genuinely helpful — most of it points everyone toward the same handful of places, the same photo from the same angle, while the quieter, stranger, more rewarding corners of the world go unvisited and untold.</p>
+  <p>{{ site.name }} exists to bring some of that back. Not by asking anyone to give up their phone, but by building a place for the kind of travel writing that used to circulate hand to hand — honest, specific, unhurried, written by people who were actually there. We hope it grows into a community that remembers what the journey itself is for, not just the arrival.</p>
+  <p>Every story on this journal is written by a real traveller, home cook, city-dweller or wanderer — not a brand. Anyone can submit a story, and you don't need an account to do it. Our editors read every submission before it's published, so the journal stays thoughtful, honest, and spam-free.</p>
+  <p>Once a story is live, readers with a free account can like it, comment on it, and share it onward. Creating an account takes under a minute and simply keeps the conversation genuine.</p>
+  <h3>What we publish</h3>
+  <p>Travel journals and guides, lifestyle essays, food and drink notes, culture and city pieces, slow-living reflections, and the odd bit of well-earned adventure. If it's honest, specific, and well told, it belongs here.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('blog.submit') }}">Submit your story</a>
+    <a class="btn btn-outline btn-lg" href="{{ url_for('blog.listing') }}">Read the journal</a>
+  </div>
+</section>
+{% endblock %}

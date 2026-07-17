@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Submit a Story — {{ site.name }}{% endblock %}
+{% block body_class %}page-submit{% endblock %}
+
+{% block content %}
+<section class="page-header page-header-narrow">
+  <div class="wrap">
+    <p class="eyebrow">Share your story</p>
+    <h1>Tell us about your trip, or your slow Sunday morning</h1>
+    <p class="page-header-sub">No account needed to submit — every story is read by our editors before it's published. Once it's live, readers with a free account can like, comment and share it.</p>
+  </div>
+</section>
+
+<section class="wrap section narrow">
+  <form class="stack-form" method="post" enctype="multipart/form-data" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-row">
+      <label for="title">Story title</label>
+      <input id="title" name="title" type="text" maxlength="140" required value="{{ form.get('title', '') }}" placeholder="Five days on the Amalfi Coast">
+    </div>
+
+    <div class="form-row two-col">
+      <div>
+        <label for="category">Category</label>
+        <select id="category" name="category" required>
+          <option value="" disabled {{ 'selected' if not form.get('category') }}>Choose one…</option>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {{ 'selected' if form.get('category') == cat }}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="location">Location <span class="optional">(optional)</span></label>
+        <input id="location" name="location" type="text" maxlength="100" value="{{ form.get('location', '') }}" placeholder="Positano, Italy">
+      </div>
+    </div>
+
+    <div class="form-row two-col">
+      <div>
+        <label for="author_name">Your name</label>
+        <input id="author_name" name="author_name" type="text" maxlength="80" required value="{{ form.get('author_name', '') }}" placeholder="How you'd like it credited">
+      </div>
+      <div>
+        <label for="author_email">Email <span class="optional">(optional, for follow-up)</span></label>
+        <input id="author_email" name="author_email" type="email" maxlength="140" value="{{ form.get('author_email', '') }}" placeholder="you@example.com">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="cover_image">Cover image <span class="optional">(optional, JPG/PNG/WEBP/GIF, up to 50MB)</span></label>
+      <input id="cover_image" name="cover_image" type="file" accept=".jpg,.jpeg,.png,.webp,.gif">
+      <p class="field-hint">Shown as the story's header, and as its thumbnail on the homepage and story listings. You'll get a quick crop &amp; zoom step to frame it before it's attached (needs JavaScript — with scripts off, your photo is used as-is).</p>
+    </div>
+
+    <div class="form-row">
+      <label for="excerpt">Short summary <span class="optional">(optional — we'll generate one if left blank)</span></label>
+      <input id="excerpt" name="excerpt" type="text" maxlength="220" value="{{ form.get('excerpt', '') }}" placeholder="One or two sentences that hook the reader">
+    </div>
+
+    <div class="form-row" data-rich-editor-wrapper>
+      <label for="content">Your story</label>
+
+      <div class="rich-editor" data-rich-editor>
+        <div class="rich-toolbar" data-rich-toolbar>
+          <button type="button" data-cmd="bold" title="Bold"><strong>B</strong></button>
+          <button type="button" data-cmd="italic" title="Italic"><em>I</em></button>
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">&#9776;</button>
+          <span class="rich-toolbar-sep"></span>
+          <select class="rich-toolbar-select" data-font-family title="Font — applies to selected text, or the whole story if nothing's selected">
+            <option value="">Default (Times New Roman)</option>
+            <option value="Georgia, 'Times New Roman', serif">Serif</option>
+            <option value="'Lora', Georgia, serif">Lora</option>
+            <option value="'Poppins', -apple-system, 'Segoe UI', sans-serif">Sans-serif</option>
+            <option value="'Courier New', monospace">Monospace</option>
+            <option value="'Caveat', cursive">Handwritten</option>
+          </select>
+          <select class="rich-toolbar-select" data-font-size title="Text size — applies to selected text, or the whole story if nothing's selected">
+            <option value="">Default size</option>
+            <option value="14px">Small</option>
+            <option value="18px">Medium</option>
+            <option value="22px">Large</option>
+            <option value="28px">X-Large</option>
+          </select>
+          <span class="rich-toolbar-sep"></span>
+          <button type="button" class="rich-toolbar-photo" data-insert-photo title="Insert photo at cursor">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Insert photo
+          </button>
+        </div>
+        <div class="rich-content" contenteditable="true" data-rich-content
+             data-placeholder="Write freely, then use the toolbar to bold/italic/list, set a font &amp; size, or click “Insert photo” to drop a picture in right where your cursor is."></div>
+      </div>
+
+      <textarea id="content" name="content" rows="14" required data-rich-fallback
+                placeholder="Write freely — basic formatting like **bold**, *italic*, line breaks and lists all work.">{{ form.get('content', '') }}</textarea>
+
+      <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" data-inline-photo-picker hidden>
+      <input type="file" name="inline_images" multiple hidden data-inline-images-input>
+
+      <p class="field-hint">Up to {{ max_gallery }} photos per story, 50MB each. Photos you insert appear right where you place them, with a crop &amp; zoom step first (including a fully freeform crop) so you can frame each one exactly how you like; pick a font and size for any selected text, or for the whole story if nothing's selected. Formatting and photo insertion need JavaScript — with scripts off you'll get a plain text box (still supports **bold**, *italic*, "- " lists).</p>
+    </div>
+
+    <div class="form-row submit-row">
+      <button type="button" class="btn btn-outline" data-preview-story>Preview story</button>
+      <button type="submit" class="btn btn-primary btn-lg">Submit for review</button>
+      <p class="field-hint">By submitting, you agree your story may be lightly edited for clarity before publishing.</p>
+    </div>
+  </form>
+</section>
+{% endblock %}

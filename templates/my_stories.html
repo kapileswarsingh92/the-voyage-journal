@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}My Stories — {{ site.name }}{% endblock %}
+{% block body_class %}page-my-stories{% endblock %}
+
+{% block content %}
+<section class="page-header page-header-narrow">
+  <div class="wrap">
+    <p class="eyebrow">Your account</p>
+    <h1>My Stories</h1>
+    <p class="page-header-sub">Everything you've submitted while signed in, with how it's doing and a way to edit it.</p>
+  </div>
+</section>
+
+<section class="wrap section narrow">
+  {% if posts %}
+  <div class="story-manage-list">
+    {% for post in posts %}
+    <article class="story-manage-card">
+      <div class="story-manage-media">
+        {% if post.cover_image %}
+        <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
+        {% endif %}
+      </div>
+      <div class="story-manage-body">
+        <div class="story-manage-top">
+          <span class="status-pill status-{{ post.status }}">
+            {% if post.status == 'approved' %}Live{% elif post.status == 'pending' %}Pending review{% else %}Declined{% endif %}
+          </span>
+          <span class="meta">{{ post.category }} · submitted {{ post.created_at[:10] }}</span>
+        </div>
+        <h3>
+          {% if post.status == 'approved' %}
+          <a href="{{ url_for('blog.detail', slug=post.slug) }}">{{ post.title }}</a>
+          {% else %}
+          {{ post.title }}
+          {% endif %}
+        </h3>
+        {% if post.status == 'rejected' and post.admin_note %}
+        <p class="story-manage-note">Editor's note: {{ post.admin_note }}</p>
+        {% elif post.status == 'pending' %}
+        <p class="story-manage-note">An editor will review this soon — you don't need to do anything else.</p>
+        {% endif %}
+
+        <div class="story-manage-stats">
+          <span title="Views"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg> {{ post.view_count }} view{{ 's' if post.view_count != 1 }}</span>
+          <span title="Likes">♥ {{ post.like_count }} like{{ 's' if post.like_count != 1 }}</span>
+          <span title="Comments">💬 {{ post.comment_count }} comment{{ 's' if post.comment_count != 1 }}</span>
+          <span title="Shares">⤴ {{ post.share_count }} share{{ 's' if post.share_count != 1 }}</span>
+        </div>
+
+        <div class="story-manage-actions">
+          <a class="btn btn-outline btn-sm" href="{{ url_for('blog.edit', slug=post.slug) }}">Edit story</a>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No stories yet</h3>
+    <p>Stories you submit while signed in will show up here, with their views, likes, shares — and an easy way to edit them.</p>
+    <a class="btn btn-primary btn-sm" href="{{ url_for('blog.submit') }}">Submit a story</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

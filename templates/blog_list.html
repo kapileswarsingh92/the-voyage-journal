@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Stories — {{ site.name }}{% endblock %}
+{% block body_class %}page-listing{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div class="wrap">
+    <p class="eyebrow">The Journal</p>
+    <h1>{{ 'Results for “' ~ q ~ '”' if q else (active_location if active_location else (active_category if active_category else 'All stories')) }}</h1>
+    <p class="page-header-sub">
+      {{ posts|length }} stor{{ 'y' if posts|length == 1 else 'ies' }}
+      {%- if active_category %} in {{ active_category }}{% endif -%}
+      {%- if active_location %} from {{ active_location }}{% endif -%}
+    </p>
+  </div>
+</section>
+
+<section class="wrap section listing-layout">
+  <aside class="filters">
+    <form class="search-form" method="get" action="{{ url_for('blog.listing') }}">
+      {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+      {% if active_location %}<input type="hidden" name="location" value="{{ active_location }}">{% endif %}
+      {% if active_sort and active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+      <input type="search" name="q" placeholder="Search stories…" value="{{ q }}">
+      <button type="submit" aria-label="Search">→</button>
+    </form>
+
+    <h4>Categories</h4>
+    <ul class="filter-list">
+      <li><a href="{{ url_for('blog.listing', q=q, location=active_location, sort=active_sort) }}" class="{{ 'active' if not active_category else '' }}">All</a></li>
+      {% for cat in categories %}
+      <li><a href="{{ url_for('blog.listing', category=cat, q=q, location=active_location, sort=active_sort) }}" class="{{ 'active' if active_category == cat else '' }}">{{ cat }}</a></li>
+      {% endfor %}
+    </ul>
+
+    {% if all_locations %}
+    <h4>Location</h4>
+    <form class="filter-select-form" method="get" action="{{ url_for('blog.listing') }}">
+      {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% if active_sort and active_sort != 'newest' %}<input type="hidden" name="sort" value="{{ active_sort }}">{% endif %}
+      <select name="location" onchange="this.form.submit()">
+        <option value="">All locations</option>
+        {% for loc in all_locations %}
+        <option value="{{ loc }}" {{ 'selected' if active_location == loc }}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+      <noscript><button type="submit" class="btn btn-outline btn-sm">Apply</button></noscript>
+    </form>
+    {% endif %}
+
+    <div class="filter-cta">
+      <p>Been somewhere worth writing about?</p>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('blog.submit') }}">Submit a story</a>
+    </div>
+  </aside>
+
+  <div class="listing-results">
+    <div class="listing-results-toolbar">
+      <form class="sort-form" method="get" action="{{ url_for('blog.listing') }}">
+        {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+        {% if active_location %}<input type="hidden" name="location" value="{{ active_location }}">{% endif %}
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        <label for="sort">Sort by</label>
+        <select id="sort" name="sort" onchange="this.form.submit()">
+          {% for value, label in sort_options.items() %}
+          <option value="{{ value }}" {{ 'selected' if active_sort == value }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn btn-outline btn-sm">Apply</button></noscript>
+      </form>
+    </div>
+    {% if posts %}
+    <div class="card-grid">
+      {% for post in posts %}
+      <a class="post-card" href="{{ url_for('blog.detail', slug=post.slug) }}">
+        <div class="post-card-media">
+          {% if post.cover_image %}
+          <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
+          {% endif %}
+          <span class="tag tag-on-media">{{ post.category }}</span>
+          {% if post.gallery_count %}<span class="photo-count-badge"><svg class="icon-camera" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> {{ post.gallery_count + 1 }}</span>{% endif %}
+        </div>
+        <div class="post-card-body">
+          <p class="meta">{{ post.location }}{% if post.location %} · {% endif %}{{ post.author_name }}</p>
+          <h3>{{ post.title }}</h3>
+          <p class="excerpt">{{ post.excerpt }}</p>
+          <div class="post-card-stats">
+            <span>♥ {{ post.like_count }}</span>
+            <span>{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>No stories here yet</h3>
+      <p>Try a different category, location, or search term — or be the first to write one.</p>
+      <a class="btn btn-primary" href="{{ url_for('blog.submit') }}">Submit a story</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

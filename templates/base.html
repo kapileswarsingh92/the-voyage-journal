@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}</title>
+<meta name="description" content="{{ site.description }}">
+<link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="{{ url_for('blog.home') }}">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="46" height="46">
+          <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="32" cy="32" r="2.6" fill="currentColor"/>
+          <path d="M32 8 L38 30 L32 32 L26 30 Z" fill="currentColor"/>
+          <path d="M32 56 L26 34 L32 32 L38 34 Z" fill="currentColor" opacity="0.45"/>
+          <text x="32" y="16" text-anchor="middle" font-size="6" fill="currentColor" font-family="Poppins, sans-serif" font-weight="600">N</text>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <span class="brand-name">{{ site.name }}</span>
+        <span class="brand-tagline">{{ site.header_tagline }}</span>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="Primary">
+      <a href="{{ url_for('blog.home') }}" class="{{ 'active' if request.endpoint == 'blog.home' else '' }}">Home</a>
+      <a href="{{ url_for('blog.listing') }}" class="{{ 'active' if request.endpoint == 'blog.listing' else '' }}">Stories</a>
+      <a href="{{ url_for('blog.submit') }}" class="{{ 'active' if request.endpoint == 'blog.submit' else '' }}">Submit a Story</a>
+      <a href="{{ url_for('blog.about') }}" class="{{ 'active' if request.endpoint == 'blog.about' else '' }}">About</a>
+      {% if current_user %}
+      <a href="{{ url_for('blog.my_stories') }}" class="{{ 'active' if request.endpoint == 'blog.my_stories' else '' }}">My Stories</a>
+      {% endif %}
+      {% if current_user and current_user['role'] == 'admin' %}
+      <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.blueprint == 'admin' else '' }}">Admin</a>
+      {% endif %}
+    </nav>
+
+    <div class="header-actions">
+      {% if current_user %}
+        <span class="header-user">Hi, {{ current_user['name'].split(' ')[0] }}</span>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Log out</a>
+      {% else %}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.login') }}">Log in</a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.signup') }}">Sign up</a>
+      {% endif %}
+      <button class="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" aria-controls="main-nav-mobile">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <nav class="main-nav main-nav--mobile" id="main-nav-mobile" aria-label="Primary mobile">
+    <a href="{{ url_for('blog.home') }}">Home</a>
+    <a href="{{ url_for('blog.listing') }}">Stories</a>
+    <a href="{{ url_for('blog.submit') }}">Submit a Story</a>
+    <a href="{{ url_for('blog.about') }}">About</a>
+    {% if current_user %}<a href="{{ url_for('blog.my_stories') }}">My Stories</a>{% endif %}
+    {% if current_user and current_user['role'] == 'admin' %}<a href="{{ url_for('admin.dashboard') }}">Admin</a>{% endif %}
+    {% if current_user %}
+      <a href="{{ url_for('auth.logout') }}">Log out</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}">Log in</a>
+      <a href="{{ url_for('auth.signup') }}">Sign up</a>
+    {% endif %}
+  </nav>
+</header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-wrap wrap">
+    {% for category, message in messages %}
+    <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="brand-name">{{ site.name }}</span>
+      <p>{{ site.description }}</p>
+    </div>
+    <div class="footer-cols">
+      <div>
+        <h4>Explore</h4>
+        <a href="{{ url_for('blog.listing') }}">All stories</a>
+        {% for cat in categories[:4] %}
+        <a href="{{ url_for('blog.listing', category=cat) }}">{{ cat }}</a>
+        {% endfor %}
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="{{ url_for('blog.submit') }}">Submit a story</a>
+        <a href="{{ url_for('auth.signup') }}">Create an account</a>
+        <a href="{{ url_for('blog.about') }}">About the journal</a>
+      </div>
+    </div>
+  </div>
+  <div class="wrap footer-bottom">
+    <span>&copy; {{ 2026 }} {{ site.name }}. Wander gently.</span>
+  </div>
+</footer>
+
+{% block prescripts %}{% endblock %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

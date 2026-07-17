@@ -1,0 +1,29 @@
+# Render "Blueprint" — lets Render read this file and set the whole
+# service up in one go (Dashboard → New → Blueprint → point at this repo)
+# instead of clicking through every setting by hand. See the deployment
+# steps in README.md for the full walkthrough.
+#
+# This defines a paid Starter web service with a small persistent disk
+# mounted at /var/data, so the SQLite database and every uploaded photo
+# survive deploys/restarts — the free plan can't attach a disk at all, and
+# without one this app would lose its data every time it redeploys.
+services:
+  - type: web
+    name: the-voyage-journal
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/voyage_journal.db
+      - key: UPLOAD_FOLDER
+        value: /var/data/uploads
+      - key: PYTHON_VERSION
+        value: 3.11.9
+    disk:
+      name: voyage-journal-data
+      mountPath: /var/data
+      sizeGB: 1

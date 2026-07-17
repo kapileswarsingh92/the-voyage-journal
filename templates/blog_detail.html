@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} — {{ site.name }}{% endblock %}
+{% block body_class %}page-detail{% endblock %}
+
+{% block content %}
+{% if preview %}
+<div class="wrap">
+  <div class="admin-preview-banner">
+    <p>
+      <strong>Admin preview</strong> — this story is
+      {% if post.status == 'pending' %}<span class="status-pill status-pending">pending review</span>
+      {% elif post.status == 'rejected' %}<span class="status-pill status-rejected">declined</span>{% endif %}
+      and isn't visible to the public yet.
+      {% if post.status == 'rejected' and post.admin_note %}<span class="preview-note">Note: {{ post.admin_note }}</span>{% endif %}
+    </p>
+    <div class="admin-preview-actions">
+      <form method="post" action="{{ url_for('admin.approve', post_id=post.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit" class="btn btn-primary btn-sm">Approve &amp; publish</button>
+      </form>
+      {% if post.status != 'rejected' %}
+      <details class="reject-details">
+        <summary class="btn btn-outline btn-sm">Decline</summary>
+        <form method="post" action="{{ url_for('admin.reject', post_id=post.id) }}" class="reject-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <textarea name="note" rows="2" placeholder="Optional note (not shown publicly)"></textarea>
+          <button type="submit" class="btn btn-ghost btn-sm">Confirm decline</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+<article id="top">
+  <header class="post-header">
+    {% if post.cover_image %}
+    <div class="post-header-media" style="background-image:url('{{ url_for('uploaded_file', filename=post.cover_image) }}')"></div>
+    <div class="post-header-scrim"></div>
+    {% endif %}
+    <div class="wrap post-header-inner">
+      <a class="tag tag-on-media" href="{{ url_for('blog.listing', category=post.category) }}">{{ post.category }}</a>
+      <h1>{{ post.title }}</h1>
+      <p class="post-meta-line">
+        {% if post.location %}{{ post.location }} · {% endif %}
+        by <strong>{{ post.author_name }}</strong> · {{ post.created_at[:10] }}
+      </p>
+    </div>
+  </header>
+
+  <div class="wrap post-layout">
+    <div class="post-body">
+      <div class="post-content">{{ post.content_html | safe }}</div>
+
+      {% if leftover_gallery %}
+      <section class="post-gallery-section">
+        <h3>More from this story</h3>
+        <div class="post-gallery" data-post-gallery>
+          {% for img in leftover_gallery %}
+          <button type="button" class="gallery-thumb" data-gallery-thumb
+                  data-full="{{ url_for('uploaded_file', filename=img.filename) }}"
+                  data-alt="{{ post.title }} — photo {{ loop.index }}">
+            <img src="{{ url_for('uploaded_file', filename=img.filename) }}" alt="{{ post.title }} — photo {{ loop.index }}" loading="lazy">
+          </button>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if not preview %}
+      <div class="post-actions" id="engage">
+        <form method="post" action="{{ url_for('blog.like', slug=post.slug) }}" class="like-form" data-like-form>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if current_user %}
+          <button type="submit" class="action-btn {{ 'is-active' if liked else '' }}" data-like-btn>
+            <span class="icon">{{ '♥' if liked else '♡' }}</span>
+            <span data-like-count>{{ post.like_count }}</span> Like{{ 's' if post.like_count != 1 }}
+          </button>
+          {% else %}
+          <a class="action-btn" href="{{ url_for('auth.login', next=request.path) }}">
+            <span class="icon">♡</span> {{ post.like_count }} Like{{ 's' if post.like_count != 1 }}
+          </a>
+          {% endif %}
+        </form>
+
+        <div class="share-wrap" data-slug="{{ post.slug }}">
+          {% if current_user %}
+          <button type="button" class="action-btn" data-share-toggle>
+            <span class="icon">⤴</span> Share
+          </button>
+          <div class="share-menu" data-share-menu hidden>
+            <a target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text={{ post.title | urlencode }}&url={{ share_url | urlencode }}">Share on X / Twitter</a>
+            <a target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u={{ share_url | urlencode }}">Share on Facebook</a>
+            <a target="_blank" rel="noopener" href="https://wa.me/?text={{ (post.title ~ ' ' ~ share_url) | urlencode }}">Share on WhatsApp</a>
+            <button type="button" data-copy-link="{{ share_url }}">Copy link</button>
+          </div>
+          {% else %}
+          <a class="action-btn" href="{{ url_for('auth.login', next=request.path) }}">
+            <span class="icon">⤴</span> Share
+          </a>
+          {% endif %}
+        </div>
+
+        <a class="action-btn" href="#comments">
+          <span class="icon">💬</span> {{ post.comment_count }} Comment{{ 's' if post.comment_count != 1 }}
+        </a>
+      </div>
+
+      <section class="comments" id="comments">
+        <h3>Comments ({{ comments|length }})</h3>
+
+        {% if current_user %}
+        <form method="post" action="{{ url_for('blog.comment', slug=post.slug) }}" class="comment-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <textarea name="content" rows="3" maxlength="2000" placeholder="Share your thoughts on this story…" required></textarea>
+          <button type="submit" class="btn btn-primary btn-sm">Post comment</button>
+        </form>
+        {% else %}
+        <div class="comment-cta">
+          <p>Have something to add? <a href="{{ url_for('auth.login', next=request.path ~ '#comments') }}">Log in</a> or <a href="{{ url_for('auth.signup', next=request.path ~ '#comments') }}">create a free account</a> to comment.</p>
+        </div>
+        {% endif %}
+
+        <ul class="comment-list">
+          {% for c in comments %}
+          <li class="comment">
+            <div class="comment-avatar">{{ c.author[0] | upper }}</div>
+            <div class="comment-body">
+              <p class="comment-meta"><strong>{{ c.author }}</strong> <span>{{ c.created_at[:16] }}</span></p>
+              <p>{{ c.content }}</p>
+            </div>
+          </li>
+          {% else %}
+          <li class="comment-empty">No comments yet — be the first to share your thoughts.</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% else %}
+      <div class="preview-engagement-note">
+        <p>Likes, sharing, and comments will be available once this story is live.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <aside class="post-sidebar">
+      <div class="sidebar-card">
+        <h4>Written by</h4>
+        <p class="author-name">{{ post.author_name }}</p>
+        {% if post.location %}<p class="author-loc">📍 {{ post.location }}</p>{% endif %}
+      </div>
+      {% if related %}
+      <div class="sidebar-card">
+        <h4>More in {{ post.category }}</h4>
+        {% for r in related %}
+        <a class="sidebar-post" href="{{ url_for('blog.detail', slug=r.slug) }}">
+          {% if r.cover_image %}<img src="{{ url_for('uploaded_file', filename=r.cover_image) }}" alt="{{ r.title }}" loading="lazy">{% endif %}
+          <span>{{ r.title }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="sidebar-card sidebar-cta">
+        <h4>Write for the journal</h4>
+        <p>Share your own trip or lifestyle story — no account needed to submit.</p>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('blog.submit') }}">Submit a story</a>
+      </div>
+      {% if current_user and current_user['id'] == post.submitted_by_user_id %}
+      <div class="sidebar-card">
+        <h4>Your story</h4>
+        <p>{{ post.view_count }} view{{ 's' if post.view_count != 1 }} · {{ post.share_count }} share{{ 's' if post.share_count != 1 }}</p>
+        <a class="btn btn-outline btn-sm" href="{{ url_for('blog.edit', slug=post.slug) }}">Edit this story</a>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+
+  {% if gallery %}
+  <div class="lightbox" data-lightbox hidden>
+    <button type="button" class="lightbox-close" data-lightbox-close aria-label="Close">&times;</button>
+    <button type="button" class="lightbox-nav lightbox-prev" data-lightbox-prev aria-label="Previous photo">&#8249;</button>
+    <img class="lightbox-img" data-lightbox-img src="" alt="">
+    <button type="button" class="lightbox-nav lightbox-next" data-lightbox-next aria-label="Next photo">&#8250;</button>
+    <span class="lightbox-caption" data-lightbox-caption></span>
+  </div>
+  {% endif %}
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>window.__csrf = {{ csrf_token() | tojson }};</script>
+{% endblock %}

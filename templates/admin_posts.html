@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}All posts — Admin — {{ site.name }}{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+
+{% block content %}
+<section class="page-header page-header-admin">
+  <div class="wrap admin-header-row">
+    <div>
+      <p class="eyebrow eyebrow-light">Admin</p>
+      <h1>All posts</h1>
+    </div>
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.dashboard') }}">← Review queue</a>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="filter-tabs">
+    <a href="{{ url_for('admin.all_posts') }}" class="{{ 'active' if not active_status }}">All</a>
+    <a href="{{ url_for('admin.all_posts', status='pending') }}" class="{{ 'active' if active_status == 'pending' }}">Pending</a>
+    <a href="{{ url_for('admin.all_posts', status='approved') }}" class="{{ 'active' if active_status == 'approved' }}">Published</a>
+    <a href="{{ url_for('admin.all_posts', status='rejected') }}" class="{{ 'active' if active_status == 'rejected' }}">Declined</a>
+  </div>
+
+  <table class="admin-table">
+    <thead>
+      <tr><th>Title</th><th>Category</th><th>Author</th><th>Status</th><th>Submitted</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for post in posts %}
+      <tr>
+        <td><a href="{{ url_for('blog.detail', slug=post.slug) }}">{{ post.title }}</a></td>
+        <td>{{ post.category }}</td>
+        <td>{{ post.author_name }}</td>
+        <td>
+          <span class="status-pill status-{{ post.status }}">{{ post.status }}</span>
+          {% if post.pinned %}<span class="status-pill status-pinned">📌 pinned</span>{% endif %}
+        </td>
+        <td>{{ post.created_at[:10] }}</td>
+        <td class="table-actions">
+          {% if post.status == 'pending' %}
+          <form method="post" action="{{ url_for('admin.approve', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-primary btn-xs">Approve</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.reject', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-ghost btn-xs">Decline</button>
+          </form>
+          {% elif post.status == 'approved' %}
+          <form method="post" action="{{ url_for('admin.unpublish', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline btn-xs">Unpublish</button>
+          </form>
+          {% if post.pinned %}
+          <form method="post" action="{{ url_for('admin.unpin', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-outline btn-xs">Unpin</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('admin.pin', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-primary btn-xs">📌 Pin to homepage</button>
+          </form>
+          {% endif %}
+          {% else %}
+          <form method="post" action="{{ url_for('admin.approve', post_id=post.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-primary btn-xs">Approve</button>
+          </form>
+          {% endif %}
+          <form method="post" action="{{ url_for('admin.delete', post_id=post.id) }}"
+                onsubmit='return confirm({{ ("Permanently delete “" ~ post.title ~ "”? This removes it, its photos, likes, and comments. This cannot be undone.") | tojson }})'>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ url_for('admin.all_posts', status=active_status) }}">
+            <button type="submit" class="btn btn-danger btn-xs">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="table-empty">No posts here.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

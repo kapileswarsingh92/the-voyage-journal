@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Story received — {{ site.name }}{% endblock %}
+
+{% block content %}
+<section class="wrap section narrow center-block">
+  <div class="success-card">
+    <span class="success-icon">✓</span>
+    <h1>Thank you — “{{ title }}” is in the queue</h1>
+    <p>Our editors will review your story shortly. Approved stories usually go live within a couple of days. You don't need to do anything else in the meantime.</p>
+    <div class="hero-actions center">
+      <a class="btn btn-primary" href="{{ url_for('blog.listing') }}">Browse other stories</a>
+      <a class="btn btn-outline" href="{{ url_for('blog.submit') }}">Submit another story</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block body_class %}page-home{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-media" style="background-image:url('{{ url_for('static', filename='img/hero.jpg') }}')"></div>
+  <div class="hero-scrim"></div>
+  <div class="wrap hero-inner">
+    <p class="eyebrow eyebrow-light">A community journal of travel &amp; lifestyle</p>
+    <h1 class="hero-title">{{ site.name }}</h1>
+    <p class="hero-tagline">{{ site.tagline }}.</p>
+    <p class="hero-desc">{{ site.description }}</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg" href="{{ url_for('blog.listing') }}">Read the stories</a>
+      <a class="btn btn-outline-light btn-lg" href="{{ url_for('blog.submit') }}">Share your story</a>
+    </div>
+  </div>
+</section>
+
+{% if featured_posts %}
+<section class="wrap section">
+  <div class="section-head">
+    <p class="eyebrow">Featured</p>
+    <h2>From the front page</h2>
+  </div>
+  <div class="feature-carousel{% if featured_posts|length > 1 %} has-multiple{% endif %}"
+       data-feature-carousel data-interval="15000">
+    <div class="feature-track" data-feature-track>
+      {% for featured in featured_posts %}
+      <a class="feature-card feature-slide" href="{{ url_for('blog.detail', slug=featured.slug) }}">
+        <div class="feature-media">
+          {% if featured.cover_image %}
+          <img src="{{ url_for('uploaded_file', filename=featured.cover_image) }}" alt="{{ featured.title }}" loading="lazy">
+          {% endif %}
+          <span class="tag tag-on-media">{{ featured.category }}</span>
+          {% if featured.pinned %}<span class="pin-badge-on-media">📌 Pinned</span>{% endif %}
+          {% if featured.gallery_count %}<span class="photo-count-badge"><svg class="icon-camera" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> {{ featured.gallery_count + 1 }}</span>{% endif %}
+        </div>
+        <div class="feature-body">
+          <p class="meta">{{ featured.location }}{% if featured.location %} · {% endif %}by {{ featured.author_name }}</p>
+          <h3>{{ featured.title }}</h3>
+          <p class="excerpt">{{ featured.excerpt }}</p>
+          <span class="link-arrow">Read the story →</span>
+          <span class="feature-stats">♥ {{ featured.like_count }} &nbsp;·&nbsp; {{ featured.comment_count }} comment{{ 's' if featured.comment_count != 1 else '' }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% if featured_posts|length > 1 %}
+    <button type="button" class="feature-nav feature-prev" data-feature-prev aria-label="Previous featured story">&#8249;</button>
+    <button type="button" class="feature-nav feature-next" data-feature-next aria-label="Next featured story">&#8250;</button>
+    <div class="feature-dots" data-feature-dots>
+      {% for featured in featured_posts %}
+      <button type="button" class="feature-dot{% if loop.first %} is-active{% endif %}" data-feature-dot="{{ loop.index0 }}" aria-label="Show featured story {{ loop.index }}"></button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if latest %}
+<section class="wrap section">
+  <div class="section-head">
+    <p class="eyebrow">Fresh off the press</p>
+    <h2>Latest stories</h2>
+    <a class="head-link" href="{{ url_for('blog.listing') }}">View all →</a>
+  </div>
+  <div class="card-grid">
+    {% for post in latest %}
+    <a class="post-card" href="{{ url_for('blog.detail', slug=post.slug) }}">
+      <div class="post-card-media">
+        {% if post.cover_image %}
+        <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
+        {% endif %}
+        <span class="tag tag-on-media">{{ post.category }}</span>
+        {% if post.gallery_count %}<span class="photo-count-badge"><svg class="icon-camera" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> {{ post.gallery_count + 1 }}</span>{% endif %}
+      </div>
+      <div class="post-card-body">
+        <p class="meta">{{ post.location }}{% if post.location %} · {% endif %}{{ post.author_name }}</p>
+        <h3>{{ post.title }}</h3>
+        <p class="excerpt">{{ post.excerpt }}</p>
+        <div class="post-card-stats">
+          <span>♥ {{ post.like_count }}</span>
+          <span>{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="wrap section how-it-works">
+  <div class="section-head center">
+    <p class="eyebrow">How it works</p>
+    <h2>Share the way you like to travel</h2>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <span class="step-num">01</span>
+      <h3>Submit — no account needed</h3>
+      <p>Write up your trip, tip or lifestyle story and send it in. No sign-up required to submit.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">02</span>
+      <h3>Our editors review it</h3>
+      <p>Every story is read by our team before it goes live, to keep the journal thoughtful and spam-free.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">03</span>
+      <h3>It goes live on the journal</h3>
+      <p>Approved stories are published for everyone to read, browse by category, and search.</p>
+    </div>
+    <div class="step">
+      <span class="step-num">04</span>
+      <h3>Create a free account to join in</h3>
+      <p>Like, comment and share stories once you've made a free account — takes less than a minute.</p>
+    </div>
+  </div>
+</section>
+
+{% if trending %}
+<section class="wrap section trending">
+  <div class="section-head">
+    <p class="eyebrow">Reader favourites</p>
+    <h2>Trending this season</h2>
+  </div>
+  <div class="trending-list">
+    {% for post in trending %}
+    <a class="trending-item" href="{{ url_for('blog.detail', slug=post.slug) }}">
+      <span class="trending-rank">{{ loop.index }}</span>
+      <div class="trending-media">
+        {% if post.cover_image %}<img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">{% endif %}
+      </div>
+      <div class="trending-body">
+        <p class="meta">{{ post.category }}</p>
+        <h4>{{ post.title }}</h4>
+      </div>
+      <span class="trending-likes">♥ {{ post.like_count }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="cta-banner">
+  <div class="wrap cta-inner">
+    <h2>Got a trip, a recipe, or a slow Sunday worth writing about?</h2>
+    <p>Anyone can submit a story — you don't need an account to send one in.</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('blog.submit') }}">Submit your story</a>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ site.name }}{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+
+{% block content %}
+<section class="page-header page-header-admin">
+  <div class="wrap admin-header-row">
+    <div>
+      <p class="eyebrow eyebrow-light">Admin</p>
+      <h1>Review queue</h1>
+    </div>
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.all_posts') }}">View all posts →</a>
+  </div>
+</section>
+
+<section class="wrap section">
+  <div class="stat-row">
+    <div class="stat-card"><span class="stat-num">{{ stats.pending }}</span><span class="stat-label">Pending review</span></div>
+    <div class="stat-card"><span class="stat-num">{{ stats.approved }}</span><span class="stat-label">Published</span></div>
+    <div class="stat-card"><span class="stat-num">{{ stats.rejected }}</span><span class="stat-label">Declined</span></div>
+    <div class="stat-card"><span class="stat-num">{{ stats.users }}</span><span class="stat-label">Registered readers</span></div>
+  </div>
+
+  {% if pending %}
+  <div class="admin-list">
+    {% for post in pending %}
+    <div class="admin-item">
+      <div class="admin-item-media">
+        {% if post.cover_image %}<img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="">{% endif %}
+      </div>
+      <div class="admin-item-body">
+        <p class="meta">{{ post.category }}{% if post.location %} · {{ post.location }}{% endif %} · submitted {{ post.created_at[:16] }}</p>
+        <h3><a href="{{ url_for('blog.detail', slug=post.slug) }}">{{ post.title }}</a></h3>
+        <p class="excerpt">{{ post.excerpt }}</p>
+        <p class="meta">By {{ post.author_name }}{% if post.author_email %} — {{ post.author_email }}{% endif %}</p>
+      </div>
+      <div class="admin-item-actions">
+        <form method="post" action="{{ url_for('admin.approve', post_id=post.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-primary btn-sm">Approve &amp; publish</button>
+        </form>
+        <details class="reject-details">
+          <summary class="btn btn-outline btn-sm">Decline</summary>
+          <form method="post" action="{{ url_for('admin.reject', post_id=post.id) }}" class="reject-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea name="note" rows="2" placeholder="Optional note (not shown publicly)"></textarea>
+            <button type="submit" class="btn btn-ghost btn-sm">Confirm decline</button>
+          </form>
+        </details>
+        <form method="post" action="{{ url_for('admin.delete', post_id=post.id) }}"
+              onsubmit='return confirm({{ ("Permanently delete “" ~ post.title ~ "”? This removes it, its photos, likes, and comments. This cannot be undone.") | tojson }})'>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>All caught up</h3>
+    <p>There are no stories waiting for review right now.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

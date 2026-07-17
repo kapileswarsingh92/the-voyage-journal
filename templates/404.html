@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Page not found — {{ site.name }}{% endblock %}
+
+{% block content %}
+<section class="wrap section narrow center-block">
+  <div class="success-card">
+    <span class="success-icon">✦</span>
+    <h1>This page has wandered off</h1>
+    <p>We couldn't find what you were looking for. It may have been moved, or never existed.</p>
+    <div class="hero-actions center">
+      <a class="btn btn-primary" href="{{ url_for('blog.home') }}">Back to the journal</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
