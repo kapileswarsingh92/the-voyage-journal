@@ -35,8 +35,8 @@
 
     <nav class="main-nav" aria-label="Primary">
       <a href="{{ url_for('blog.home') }}" class="{{ 'active' if request.endpoint == 'blog.home' else '' }}">Home</a>
-      <a href="{{ url_for('blog.listing') }}" class="{{ 'active' if request.endpoint == 'blog.listing' else '' }}">Stories</a>
-      <a href="{{ url_for('blog.submit') }}" class="{{ 'active' if request.endpoint == 'blog.submit' else '' }}">Submit your Story</a>
+      <a href="{{ url_for('blog.listing') }}" class="{{ 'active' if request.endpoint == 'blog.listing' else '' }}">Collections</a>
+      <a href="{{ url_for('blog.submit') }}" class="{{ 'active' if request.endpoint == 'blog.submit' else '' }}">Share your Journey</a>
       <a href="{{ url_for('blog.about') }}" class="{{ 'active' if request.endpoint == 'blog.about' else '' }}">About</a>
       {% if current_user %}
       <a href="{{ url_for('blog.my_stories') }}" class="{{ 'active' if request.endpoint == 'blog.my_stories' else '' }}">My Stories</a>
@@ -52,7 +52,7 @@
         <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.logout') }}">Log out</a>
       {% else %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.login') }}">Log in</a>
-        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.signup') }}">Sign up</a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('auth.signup') }}">Subscribe</a>
       {% endif %}
       <button class="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" aria-controls="main-nav-mobile">
         <span></span><span></span><span></span>
@@ -61,8 +61,8 @@
   </div>
   <nav class="main-nav main-nav--mobile" id="main-nav-mobile" aria-label="Primary mobile">
     <a href="{{ url_for('blog.home') }}">Home</a>
-    <a href="{{ url_for('blog.listing') }}">Stories</a>
-    <a href="{{ url_for('blog.submit') }}">Submit your Story</a>
+    <a href="{{ url_for('blog.listing') }}">Collections</a>
+    <a href="{{ url_for('blog.submit') }}">Share your Journey</a>
     <a href="{{ url_for('blog.about') }}">About</a>
     {% if current_user %}<a href="{{ url_for('blog.my_stories') }}">My Stories</a>{% endif %}
     {% if current_user and current_user['role'] == 'admin' %}<a href="{{ url_for('admin.dashboard') }}">Admin</a>{% endif %}
@@ -70,7 +70,7 @@
       <a href="{{ url_for('auth.logout') }}">Log out</a>
     {% else %}
       <a href="{{ url_for('auth.login') }}">Log in</a>
-      <a href="{{ url_for('auth.signup') }}">Sign up</a>
+      <a href="{{ url_for('auth.signup') }}">Subscribe</a>
     {% endif %}
   </nav>
 </header>

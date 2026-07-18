@@ -723,11 +723,14 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   .admin-item-actions { grid-column: 1 / -1; flex-direction: row; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1060px) {
   .main-nav { display: none; }
   .nav-toggle { display: flex; }
   .main-nav--mobile.is-open { display: flex; }
   .header-user { display: none; }
+}
+
+@media (max-width: 720px) {
   .brand-tagline { max-width: 300px; font-size: .62rem; line-height: 1.35; white-space: nowrap; }
 }
 
