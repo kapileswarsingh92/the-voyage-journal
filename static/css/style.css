@@ -140,14 +140,19 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   white-space: normal;
 }
 
-.main-nav { display: flex; align-items: center; gap: 15px; }
-.main-nav a { font-size: .92rem; font-weight: 500; color: var(--ink-soft); padding: 6px 0; border-bottom: 2px solid transparent; }
+.main-nav { display: flex; align-items: center; gap: 0; }
+.main-nav a { font-size: .8rem; font-weight: 500; color: var(--ink-soft); padding: 6px 10px; border-bottom: 2px solid transparent; position: relative; }
 .main-nav a:hover, .main-nav a.active { color: var(--terracotta); border-color: var(--terracotta); }
+.main-nav:not(.main-nav--mobile) a:not(:first-child)::before {
+  content: "|"; position: absolute; left: 0; top: 6px;
+  color: var(--line-soft); font-weight: 400;
+}
 .main-nav--mobile { display: none; flex-direction: column; gap: 0; padding: 6px 28px 18px; }
 .main-nav--mobile a { padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
 
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.header-user { font-size: .88rem; color: var(--ink-soft); margin-right: 4px; }
+.header-actions .btn-sm { font-size: .76rem; padding: 7px 15px; }
+.header-user { font-size: .8rem; color: var(--ink-soft); margin-right: 4px; }
 .nav-toggle { display: none; flex-direction: column; gap: 4px; background: none; border: none; cursor: pointer; padding: 6px; }
 .nav-toggle span { width: 22px; height: 2px; background: var(--ink); display: block; }
 
