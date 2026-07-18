@@ -123,7 +123,7 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   backdrop-filter: saturate(160%) blur(10px);
   border-bottom: 1px solid var(--line-soft);
 }
-.header-inner { display: flex; align-items: center; gap: 28px; padding: 14px 28px; }
+.header-inner { display: flex; align-items: center; gap: 18px; padding: 14px 28px; }
 .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
 .brand-mark { color: var(--terracotta); display: flex; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
@@ -140,7 +140,7 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   white-space: normal;
 }
 
-.main-nav { display: flex; align-items: center; gap: 26px; }
+.main-nav { display: flex; align-items: center; gap: 15px; }
 .main-nav a { font-size: .92rem; font-weight: 500; color: var(--ink-soft); padding: 6px 0; border-bottom: 2px solid transparent; }
 .main-nav a:hover, .main-nav a.active { color: var(--terracotta); border-color: var(--terracotta); }
 .main-nav--mobile { display: none; flex-direction: column; gap: 0; padding: 6px 28px 18px; }
