@@ -11,7 +11,7 @@
     <p class="hero-tagline">{{ site.tagline }}.</p>
     <p class="hero-desc">{{ site.description }}</p>
     <div class="hero-actions">
-      <a class="btn btn-primary btn-lg" href="{{ url_for('blog.listing') }}">Read the stories</a>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('blog.listing') }}">Explore stories</a>
       <a class="btn btn-outline-light btn-lg" href="{{ url_for('blog.submit') }}">Share your story</a>
     </div>
   </div>
@@ -66,26 +66,49 @@
     <h2>Latest stories</h2>
     <a class="head-link" href="{{ url_for('blog.listing') }}">View all →</a>
   </div>
-  <div class="card-grid">
+  <div class="latest-layout">
     {% for post in latest %}
-    <a class="post-card" href="{{ url_for('blog.detail', slug=post.slug) }}">
-      <div class="post-card-media">
-        {% if post.cover_image %}
-        <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
-        {% endif %}
-        <span class="tag tag-on-media">{{ post.category }}</span>
-        {% if post.gallery_count %}<span class="photo-count-badge"><svg class="icon-camera" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> {{ post.gallery_count + 1 }}</span>{% endif %}
-      </div>
-      <div class="post-card-body">
-        <p class="meta">{{ post.location }}{% if post.location %} · {% endif %}{{ post.author_name }}</p>
-        <h3>{{ post.title }}</h3>
-        <p class="excerpt">{{ post.excerpt }}</p>
-        <div class="post-card-stats">
-          <span>♥ {{ post.like_count }}</span>
-          <span>{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</span>
+      {% if loop.first %}
+      <a class="post-card post-card--lead" href="{{ url_for('blog.detail', slug=post.slug) }}">
+        <div class="post-card-media">
+          {% if post.cover_image %}
+          <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
+          {% endif %}
+          <span class="tag tag-on-media">{{ post.category }}</span>
+          {% if post.gallery_count %}<span class="photo-count-badge"><svg class="icon-camera" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> {{ post.gallery_count + 1 }}</span>{% endif %}
         </div>
+        <div class="post-card-body">
+          <p class="meta">{{ post.location }}{% if post.location %} · {% endif %}{{ post.author_name }}</p>
+          <h3>{{ post.title }}</h3>
+          <p class="excerpt">{{ post.excerpt }}</p>
+          <div class="post-card-stats">
+            <span>♥ {{ post.like_count }}</span>
+            <span>{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</span>
+          </div>
+        </div>
+      </a>
+      <div class="latest-secondary">
+      {% endif %}
+      {% if not loop.first %}
+        <a class="post-card post-card--compact" href="{{ url_for('blog.detail', slug=post.slug) }}">
+          <div class="post-card-media">
+            {% if post.cover_image %}
+            <img src="{{ url_for('uploaded_file', filename=post.cover_image) }}" alt="{{ post.title }}" loading="lazy">
+            {% endif %}
+          </div>
+          <div class="post-card-body">
+            <p class="meta">{{ post.location }}{% if post.location %} · {% endif %}{{ post.author_name }}</p>
+            <h3>{{ post.title }}</h3>
+            <div class="post-card-stats">
+              <span>♥ {{ post.like_count }}</span>
+              <span>{{ post.comment_count }} comment{{ 's' if post.comment_count != 1 else '' }}</span>
+            </div>
+          </div>
+        </a>
+      {% endif %}
+      {% if loop.last %}
       </div>
-    </a>
+      {% endif %}
     {% endfor %}
   </div>
 </section>
