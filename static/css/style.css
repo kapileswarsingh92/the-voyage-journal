@@ -612,6 +612,7 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .success-icon { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; background: var(--teal); color: var(--paper); font-size: 1.5rem; margin-bottom: 20px; }
 
 .prose p { font-size: 1.02rem; }
+.contact-heading { margin-top: 48px; }
 
 /* ---------- Admin ---------- */
 .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px; }
