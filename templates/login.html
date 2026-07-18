@@ -21,9 +21,6 @@
       <button type="submit" class="btn btn-primary btn-lg btn-block">Log in</button>
     </form>
     <p class="auth-switch">New here? <a href="{{ url_for('auth.signup', next=request.args.get('next')) }}">Create a free account</a></p>
-    <div class="auth-demo">
-      <p><strong>Demo admin login</strong> — email <code>admin@voyagejournal.com</code>, password <code>AdminDemo123</code></p>
-    </div>
   </div>
 </section>
 {% endblock %}
