@@ -378,6 +378,21 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .post-content blockquote { border-left: 3px solid var(--mustard); margin: 1.4em 0; padding: .4em 0 .4em 1.2em; color: var(--ink-soft); font-style: italic; }
 .post-content a { color: var(--terracotta); text-decoration: underline; }
 
+/* Tables pasted in from Word/Pages/Excel — shared look for the published
+   story and the live editor (.rich-content below reuses these same rules).
+   display:block + overflow-x:auto lets a wide table scroll horizontally on
+   narrow screens instead of squeezing columns unreadably or breaking the
+   page layout. */
+.post-content table, .rich-content table {
+  display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  width: 100%; margin: 0 0 1.2em; border-collapse: collapse; font-size: .95em;
+}
+.post-content td, .post-content th, .rich-content td, .rich-content th {
+  border: 1px solid var(--line-soft); padding: 8px 12px; text-align: left; vertical-align: top;
+}
+.post-content th, .rich-content th { background: var(--cream-2); font-weight: 600; }
+.post-content tr:nth-child(even) td, .rich-content tr:nth-child(even) td { background: rgba(36,28,22,.02); }
+
 .post-actions { display: flex; align-items: center; gap: 14px; margin: 34px 0; padding: 16px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); flex-wrap: wrap; }
 .like-form { display: inline-flex; }
 .action-btn {

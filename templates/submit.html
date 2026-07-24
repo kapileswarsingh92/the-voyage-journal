@@ -58,7 +58,7 @@
       <input id="excerpt" name="excerpt" type="text" maxlength="220" value="{{ form.get('excerpt', '') }}" placeholder="One or two sentences that hook the reader">
     </div>
 
-    <div class="form-row" data-rich-editor-wrapper>
+    <div class="form-row" data-rich-editor-wrapper data-max-gallery="{{ max_gallery }}">
       <label for="content">Your story</label>
 
       <div class="rich-editor" data-rich-editor>
@@ -98,7 +98,7 @@
       <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" data-inline-photo-picker hidden>
       <input type="file" name="inline_images" multiple hidden data-inline-images-input>
 
-      <p class="field-hint">Up to {{ max_gallery }} photos per story, 50MB each. Photos you insert appear right where you place them, with a crop &amp; zoom step first (including a fully freeform crop) so you can frame each one exactly how you like; pick a font and size for any selected text, or for the whole story if nothing's selected. Formatting and photo insertion need JavaScript — with scripts off you'll get a plain text box (still supports **bold**, *italic*, "- " lists).</p>
+      <p class="field-hint">You can paste directly from Word, Pages, or Google Docs — bold/italic, fonts and sizes, and tables all carry over. Any images in the pasted text are attached automatically, same as clicking “Insert photo.” Up to {{ max_gallery }} photos per story, 50MB each. Photos you insert appear right where you place them, with a crop &amp; zoom step first (including a fully freeform crop) so you can frame each one exactly how you like; pick a font and size for any selected text, or for the whole story if nothing's selected. Formatting and photo insertion need JavaScript — with scripts off you'll get a plain text box (still supports **bold**, *italic*, "- " lists).</p>
     </div>
 
     <div class="form-row submit-row">

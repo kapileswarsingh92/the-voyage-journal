@@ -178,12 +178,26 @@ def validate_csrf(form) -> bool:
 # ids, event handlers, href/src, arbitrary CSS) ever survives.
 # ---------------------------------------------------------------------------
 
-_STORY_ALLOWED_TAGS = {"p", "div", "br", "b", "strong", "i", "em", "ul", "ol", "li", "span"}
+_STORY_ALLOWED_TAGS = {
+    "p", "div", "br", "b", "strong", "i", "em", "ul", "ol", "li", "span",
+    # Table tags: kept as themselves (not unwrapped to <p> like a bare <div>)
+    # so a table pasted in from Word/Pages/Excel keeps its grid structure
+    # instead of collapsing into a run of plain paragraphs.
+    "table", "thead", "tbody", "tfoot", "tr", "td", "th",
+}
 _STORY_VOID_TAGS = {"br"}
+_STORY_TABLE_TAGS = {"table", "thead", "tbody", "tfoot", "tr", "td", "th"}
 
 _STYLE_DECL_RE = re.compile(r"^\s*([a-zA-Z-]+)\s*:\s*(.+?)\s*$")
 _FONT_FAMILY_VALUE_RE = re.compile(r"^[a-zA-Z0-9 ,'\".-]{1,80}$")
-_FONT_SIZE_VALUE_RE = re.compile(r"^\d{1,3}(\.\d{1,2})?(px|em|rem|%)$")
+# Word/Pages/Excel paste consistently expresses copied font sizes in points
+# (e.g. "font-size:12pt") rather than px/em/rem/% — without "pt" here, every
+# font size a user pastes in from a Word/Pages doc was silently dropped even
+# though the rest of the run-formatting (bold/italic/family) survived.
+_FONT_SIZE_VALUE_RE = re.compile(r"^\d{1,3}(\.\d{1,2})?(px|em|rem|%|pt)$")
+# Merged-cell spans from a pasted table — digits only, small range, nothing
+# else is ever kept on a table-related tag (no style/class/width/border/...).
+_SPAN_ATTR_VALUE_RE = re.compile(r"^([1-9]|[1-4][0-9]|50)$")  # 1-50
 
 
 def _clean_story_style(style_value: str) -> str:
@@ -240,6 +254,17 @@ class _StoryHTMLSanitizer(HTMLParser):
             if not style:
                 return  # nothing safe survived — a bare <span> isn't worth keeping
             self.out.append('<span style="' + html_lib.escape(style, quote=True) + '">')
+        elif out_tag in ("td", "th"):
+            # colspan/rowspan are the only attributes ever kept on a table
+            # tag (needed so a merged-cell header row from a pasted table
+            # doesn't silently collapse back into a plain grid) — digits
+            # only, everything else (style/class/width/bgcolor/...) is
+            # always dropped, same as every other tag here.
+            kept_attrs = ""
+            for name, value in attrs:
+                if name in ("colspan", "rowspan") and _SPAN_ATTR_VALUE_RE.match((value or "").strip()):
+                    kept_attrs += f' {name}="{value.strip()}"'
+            self.out.append(f"<{out_tag}{kept_attrs}>")
         else:
             self.out.append(f"<{out_tag}>")
 

@@ -593,6 +593,7 @@
 
     var pendingFiles = new Map(); // uid -> File
     var savedRange = null;
+    var maxGalleryImages = parseInt(richWrapper.getAttribute("data-max-gallery"), 10) || 0;
 
     try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) { /* best effort */ }
 
@@ -694,7 +695,11 @@
     // at submit time.
     function isBlockOrPhotoNode(node) {
       if (node.nodeType !== Node.ELEMENT_NODE) return false;
-      if (["P", "DIV", "UL", "OL"].indexOf(node.tagName) !== -1) return true;
+      // TABLE is block-level too — pasted in from Word/Pages/Excel — so it
+      // never gets swept up and wrapped inside a synthetic <p> the way a
+      // loose run of text would be (a <table> nested inside a <p> is invalid
+      // and would be unwrapped/mangled by the server sanitizer).
+      if (["P", "DIV", "UL", "OL", "TABLE"].indexOf(node.tagName) !== -1) return true;
       return !!(node.classList && (
         node.classList.contains("rt-photo") ||
         node.classList.contains("rt-photo-existing") ||
@@ -936,6 +941,100 @@
     richContent.addEventListener("keyup", saveSelection);
     richContent.addEventListener("mouseup", saveSelection);
     richContent.addEventListener("input", function () {
+      saveSelection();
+      syncFallback();
+    });
+
+    // --- paste from Word / Pages / Excel / Google Docs, etc. ---
+    // The browser's native rich paste already reproduces bold/italic/lists,
+    // font-family & font-size (as inline <span style>), and full <table>
+    // markup as real HTML — the same shapes the toolbar itself produces —
+    // so the server's allowlist sanitizer (which now also keeps table tags
+    // and accepts "pt" font sizes, the unit Word/Pages paste uses) covers
+    // pasted content the same way it covers typed/toolbar-formatted content.
+    // The one thing native paste can't hand off correctly is images: a
+    // copied image normally lands as inline <img src="data:..."> or a
+    // blob:/file: reference, but a story's images have to be real uploaded
+    // files (for the crop step, gallery limits, and disk cleanup later) —
+    // an <img> tag isn't on the sanitizer's allowlist at all, so left alone
+    // it would just silently vanish on save. Instead: any image files
+    // actually present on the clipboard are pulled out and routed through
+    // the exact same insertPhoto() the toolbar's "Insert photo" button
+    // uses; any leftover <img> the browser inserted anyway (a reference we
+    // can't recover real bytes from) is swapped for a plain re-attach
+    // notice so nothing disappears without a trace.
+    function currentPhotoCount() {
+      return richContent.querySelectorAll(".rt-photo, .rt-photo-existing").length;
+    }
+
+    function cleanUpStrayPastedImages() {
+      var strays = Array.prototype.filter.call(richContent.querySelectorAll("img"), function (img) {
+        return !img.closest(".rt-photo, .rt-photo-existing, .rt-photo-chip");
+      });
+      strays.forEach(function (img) {
+        var chip = document.createElement("div");
+        chip.className = "rt-photo-chip";
+        chip.contentEditable = "false";
+        chip.textContent = "📷 An image from your paste couldn't be attached automatically — please use “Insert photo” to add it.";
+        img.replaceWith(chip);
+      });
+    }
+
+    richContent.addEventListener("paste", function (e) {
+      var cd = e.clipboardData;
+      if (!cd) return;
+
+      var imageFiles = [];
+      for (var i = 0; i < cd.items.length; i++) {
+        var item = cd.items[i];
+        if (item.kind === "file" && item.type && item.type.indexOf("image/") === 0) {
+          var f = item.getAsFile();
+          if (f) imageFiles.push(f);
+        }
+      }
+
+      if (!imageFiles.length) {
+        // No recoverable image bytes on the clipboard — let the browser's
+        // normal rich paste bring in text, formatting and tables as-is,
+        // then just sweep up any orphaned <img> reference afterwards.
+        setTimeout(function () {
+          cleanUpStrayPastedImages();
+          syncFallback();
+        }, 0);
+        return;
+      }
+
+      // Real image bytes are present — take over the paste so each image
+      // goes through the managed upload flow instead of landing as an
+      // orphaned data: URI the server would just strip back out.
+      e.preventDefault();
+      richContent.focus();
+      restoreSelection();
+
+      var html = cd.getData("text/html");
+      var text = cd.getData("text/plain");
+      if (html) {
+        document.execCommand("insertHTML", false, html);
+      } else if (text) {
+        document.execCommand("insertText", false, text);
+      }
+      // The HTML we just inserted may itself reference the same images
+      // (Word/Pages often includes both) — strip those so nothing ends up
+      // attached twice.
+      cleanUpStrayPastedImages();
+
+      var room = maxGalleryImages ? maxGalleryImages - currentPhotoCount() : imageFiles.length;
+      room = Math.max(room, 0);
+      imageFiles.slice(0, room).forEach(function (file) {
+        insertPhoto(file);
+      });
+      if (imageFiles.length > room) {
+        window.alert(
+          "This story can have up to " + maxGalleryImages + " photos in total, so " +
+          (imageFiles.length - room) + " pasted image(s) weren't added. Remove a photo, " +
+          "then use “Insert photo” to add the rest."
+        );
+      }
       saveSelection();
       syncFallback();
     });

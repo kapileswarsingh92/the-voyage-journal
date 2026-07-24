@@ -68,7 +68,7 @@
       <input id="excerpt" name="excerpt" type="text" maxlength="220" value="{{ form.get('excerpt') or '' }}">
     </div>
 
-    <div class="form-row" data-rich-editor-wrapper>
+    <div class="form-row" data-rich-editor-wrapper data-max-gallery="{{ max_gallery }}">
       <label for="content">Your story</label>
 
       <div class="rich-editor" data-rich-editor>
@@ -108,7 +108,7 @@
       <input type="file" name="inline_images" multiple hidden data-inline-images-input>
       <input type="hidden" name="photo_plan" data-photo-plan-input value="">
 
-      <p class="field-hint">Up to {{ max_gallery }} photos per story, 50MB each. Photos already in your story appear right where they were placed — remove one with its × or insert new ones with the toolbar (each gets a crop &amp; zoom step first, including a fully freeform crop). Pick a font and size for any selected text, or for the whole story if nothing's selected.</p>
+      <p class="field-hint">You can paste directly from Word, Pages, or Google Docs — bold/italic, fonts and sizes, and tables all carry over, and any images in the pasted text are attached automatically. Up to {{ max_gallery }} photos per story, 50MB each. Photos already in your story appear right where they were placed — remove one with its × or insert new ones with the toolbar (each gets a crop &amp; zoom step first, including a fully freeform crop). Pick a font and size for any selected text, or for the whole story if nothing's selected.</p>
     </div>
 
     {% if leftover %}
