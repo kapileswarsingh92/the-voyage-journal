@@ -32,12 +32,17 @@ from .utils import (
 bp = Blueprint("blog", __name__)
 
 
-INLINE_PHOTO_RE = re.compile(r"\[\[photo:(\d+)\]\]")
+INLINE_PHOTO_SIZES = {"small", "medium", "large", "full"}
+# The optional |size suffix is new; every token saved before this feature
+# existed is a bare [[photo:N]], which still matches (group 2 is None) and
+# is treated as "full" — see render_story_content — so nothing already
+# published needs a migration.
+INLINE_PHOTO_RE = re.compile(r"\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]")
 
 
 def referenced_photo_positions(raw: str) -> set:
     """Which post_images positions (0-indexed) are placed inline via [[photo:N]] tokens."""
-    return {int(n) - 1 for n in INLINE_PHOTO_RE.findall(raw or "")}
+    return {int(m.group(1)) - 1 for m in INLINE_PHOTO_RE.finditer(raw or "")}
 
 
 def normalize_story_content(raw: str) -> str:
@@ -78,10 +83,13 @@ def render_story_content(stored_html: str, images=None) -> str:
         n = int(match.group(1))
         if n < 1 or n > len(images):
             return ""
+        size = match.group(2) or "full"
+        if size not in INLINE_PHOTO_SIZES:
+            size = "full"
         img = images[n - 1]
         url = url_for("uploaded_file", filename=img["filename"])
         return (
-            '<figure class="inline-photo">'
+            f'<figure class="inline-photo inline-photo--{size}">'
             f'<button type="button" class="gallery-thumb inline-gallery-thumb" data-gallery-thumb '
             f'data-full="{url}" data-alt="Story photo {n}">'
             f'<img src="{url}" alt="Story photo {n}" loading="lazy"></button>'
@@ -90,7 +98,9 @@ def render_story_content(stored_html: str, images=None) -> str:
 
     # The token is normally alone in its own paragraph; swap the whole
     # paragraph so the figure stays a clean block element.
-    html_out = re.sub(r"<p>\s*\[\[photo:(\d+)\]\]\s*</p>", _swap, html_out)
+    html_out = re.sub(
+        r"<p>\s*\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]\s*</p>", _swap, html_out
+    )
     # fallback for a token left inline within running text
     html_out = INLINE_PHOTO_RE.sub(_swap, html_out)
     return html_out

@@ -599,13 +599,35 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   content: attr(data-placeholder); color: var(--ink-faint);
 }
 
-.rt-photo, .rt-photo-existing { position: relative; margin: 14px 0; display: block; max-width: 420px; }
-.rt-photo img, .rt-photo-existing img { width: 100%; border-radius: var(--radius); display: block; }
-.rt-photo-remove {
-  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; border: none;
-  background: rgba(20,15,12,.65); color: var(--paper); font-size: 1.1rem; line-height: 1; cursor: pointer;
+.rt-photo, .rt-photo-existing {
+  position: relative; margin: 14px auto; display: block; max-width: 420px; transition: max-width .15s ease;
 }
-.rt-photo-remove:hover { background: rgba(20,15,12,.85); }
+.rt-photo[data-size="small"], .rt-photo-existing[data-size="small"] { max-width: 220px; }
+.rt-photo[data-size="medium"], .rt-photo-existing[data-size="medium"] { max-width: 340px; }
+.rt-photo[data-size="large"], .rt-photo-existing[data-size="large"] { max-width: 480px; }
+.rt-photo[data-size="full"], .rt-photo-existing[data-size="full"] { max-width: 100%; }
+.rt-photo img, .rt-photo-existing img { width: 100%; border-radius: var(--radius); display: block; }
+
+/* Toolbar under each inline photo in the editor: size picker + move + remove */
+.rt-photo-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 6px; padding: 4px 6px; border-radius: 999px; background: var(--cream-2);
+}
+.rt-photo-sizes, .rt-photo-tools { display: flex; align-items: center; gap: 2px; }
+.rt-photo-size-btn {
+  border: none; background: transparent; border-radius: 999px; padding: 4px 10px;
+  font-size: .72rem; font-weight: 600; color: var(--ink-faint); cursor: pointer; line-height: 1.4;
+}
+.rt-photo-size-btn:hover { background: rgba(20,15,12,.08); color: var(--ink); }
+.rt-photo-size-btn.is-active { background: var(--ink); color: var(--paper); }
+.rt-photo-move, .rt-photo-remove {
+  border: none; background: transparent; border-radius: 50%; width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--ink-faint); font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.rt-photo-move:hover, .rt-photo-remove:hover { background: rgba(20,15,12,.12); color: var(--ink); }
+.rt-photo-move:disabled { opacity: .35; cursor: default; }
+.rt-photo-move:disabled:hover { background: transparent; color: var(--ink-faint); }
 .rt-photo-chip {
   display: inline-block; margin: 8px 0; padding: 8px 14px; border-radius: 999px; background: var(--cream-2);
   color: var(--ink-faint); font-size: .85rem; font-style: italic;
@@ -618,6 +640,10 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .rich-content .inline-photo img, .preview-modal .inline-photo img {
   width: 100%; height: auto; border-radius: var(--radius-lg); display: block;
 }
+.inline-photo--small { max-width: 320px; margin-left: auto; margin-right: auto; }
+.inline-photo--medium { max-width: 520px; margin-left: auto; margin-right: auto; }
+.inline-photo--large { max-width: 760px; margin-left: auto; margin-right: auto; }
+.inline-photo--full { max-width: 100%; }
 
 /* ---------- "Preview my story" modal (submit / edit pages) ---------- */
 .preview-modal-overlay {

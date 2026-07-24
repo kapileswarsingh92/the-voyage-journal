@@ -624,15 +624,137 @@
     // know the story's already-saved photos — edit page, first load only)
     // or a "please re-attach" chip (after a validation error, when we no
     // longer have the underlying upload to show a thumbnail for). ---
-    function makeExistingPhotoBlock(filename, url) {
-      var wrapper = document.createElement("div");
-      wrapper.className = "rt-photo-existing";
-      wrapper.contentEditable = "false";
-      wrapper.setAttribute("data-filename", filename);
+    // Shared toolbar attached under every inline photo block (both freshly
+    // inserted and existing ones re-hydrated on load) — lets an author pick
+    // a display size (small/medium/large/full, stored as [[photo:N|size]])
+    // and nudge the photo earlier/later among the story's other blocks,
+    // alongside the existing remove control.
+    var PHOTO_SIZES = [["small", "S"], ["medium", "M"], ["large", "L"], ["full", "Full"]];
 
-      var img = document.createElement("img");
-      img.src = url;
-      img.alt = "";
+    // A blank <p><br></p> spacer is auto-inserted after every photo purely
+    // so the caret has somewhere to land (see ensureTrailingParagraph) — it
+    // carries no content of the author's, so "move" has to look past it.
+    // Without this, moving a photo "up" would just swap it with its own
+    // trailing spacer and appear to do nothing.
+    function isEmptyGapParagraph(node) {
+      return !!(
+        node && node.nodeType === Node.ELEMENT_NODE && node.tagName === "P" &&
+        !node.querySelector("img") && !(node.textContent || "").trim()
+      );
+    }
+
+    function significantSibling(node, direction) {
+      var sib = direction === "up" ? node.previousElementSibling : node.nextElementSibling;
+      while (sib && isEmptyGapParagraph(sib)) {
+        sib = direction === "up" ? sib.previousElementSibling : sib.nextElementSibling;
+      }
+      return sib;
+    }
+
+    // Merges consecutive blank spacer paragraphs left behind after a move
+    // (e.g. a photo's own trailing spacer ending up next to another block's)
+    // down to a single one, purely cosmetic tidying of the editor view —
+    // empty paragraphs are stripped out entirely at save time regardless.
+    function collapseAdjacentEmptyGaps() {
+      var children = Array.prototype.slice.call(richContent.children);
+      for (var i = children.length - 1; i > 0; i--) {
+        if (isEmptyGapParagraph(children[i]) && isEmptyGapParagraph(children[i - 1])) {
+          children[i].remove();
+        }
+      }
+    }
+
+    function refreshPhotoToolbarState(wrapper) {
+      var size = wrapper.getAttribute("data-size") || "full";
+      Array.prototype.forEach.call(wrapper.querySelectorAll("[data-size-btn]"), function (btn) {
+        btn.classList.toggle("is-active", btn.getAttribute("data-size-btn") === size);
+      });
+      var toolbar = wrapper.querySelector(".rt-photo-toolbar");
+      if (!toolbar) return;
+      var upBtn = toolbar.querySelector('[data-move="up"]');
+      var downBtn = toolbar.querySelector('[data-move="down"]');
+      // Only meaningful once the wrapper is actually attached under
+      // richContent — right after buildPhotoWrapper() creates it, it's a
+      // detached node with no siblings at all, so skip the disabled check
+      // rather than wrongly locking both buttons; refreshAllPhotoToolbars()
+      // (called after every insertion/removal/move) recomputes it correctly.
+      if (wrapper.parentNode !== richContent) return;
+      if (upBtn) upBtn.disabled = !significantSibling(wrapper, "up");
+      if (downBtn) downBtn.disabled = !significantSibling(wrapper, "down");
+    }
+
+    // Recomputes up/down disabled state for every photo block currently in
+    // the story — needed whenever the set or order of top-level blocks
+    // changes, since a single wrapper's own refresh can't know about the
+    // neighbors it swapped with.
+    function refreshAllPhotoToolbars() {
+      Array.prototype.forEach.call(
+        richContent.querySelectorAll(".rt-photo, .rt-photo-existing"),
+        refreshPhotoToolbarState
+      );
+    }
+
+    // Swaps a photo block with the nearest preceding/following block that
+    // actually carries content — another photo, or a paragraph with text —
+    // skipping past blank spacer paragraphs so a single click always moves
+    // the photo past the next "real" thing rather than an invisible gap.
+    function movePhotoBlock(wrapper, direction) {
+      var target = significantSibling(wrapper, direction);
+      if (!target) return;
+      if (direction === "up") {
+        richContent.insertBefore(wrapper, target);
+      } else {
+        richContent.insertBefore(target, wrapper);
+      }
+      collapseAdjacentEmptyGaps();
+      refreshAllPhotoToolbars();
+      syncFallback();
+    }
+
+    function attachPhotoToolbar(wrapper) {
+      if (!wrapper.getAttribute("data-size")) wrapper.setAttribute("data-size", "full");
+
+      var toolbar = document.createElement("div");
+      toolbar.className = "rt-photo-toolbar";
+      toolbar.contentEditable = "false";
+
+      var sizes = document.createElement("div");
+      sizes.className = "rt-photo-sizes";
+      PHOTO_SIZES.forEach(function (pair) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "rt-photo-size-btn";
+        btn.setAttribute("data-size-btn", pair[0]);
+        btn.title = "Display size: " + pair[1];
+        btn.textContent = pair[1];
+        btn.addEventListener("click", function () {
+          wrapper.setAttribute("data-size", pair[0]);
+          refreshPhotoToolbarState(wrapper);
+          syncFallback();
+        });
+        sizes.appendChild(btn);
+      });
+
+      var tools = document.createElement("div");
+      tools.className = "rt-photo-tools";
+
+      var upBtn = document.createElement("button");
+      upBtn.type = "button";
+      upBtn.className = "rt-photo-move";
+      upBtn.setAttribute("data-move", "up");
+      upBtn.setAttribute("aria-label", "Move photo earlier in the story");
+      upBtn.title = "Move up";
+      upBtn.innerHTML = "&uarr;";
+      upBtn.addEventListener("click", function () { movePhotoBlock(wrapper, "up"); });
+
+      var downBtn = document.createElement("button");
+      downBtn.type = "button";
+      downBtn.className = "rt-photo-move";
+      downBtn.setAttribute("data-move", "down");
+      downBtn.setAttribute("aria-label", "Move photo later in the story");
+      downBtn.title = "Move down";
+      downBtn.innerHTML = "&darr;";
+      downBtn.addEventListener("click", function () { movePhotoBlock(wrapper, "down"); });
 
       var removeBtn = document.createElement("button");
       removeBtn.type = "button";
@@ -640,25 +762,52 @@
       removeBtn.setAttribute("aria-label", "Remove photo");
       removeBtn.innerHTML = "&times;";
       removeBtn.addEventListener("click", function () {
+        var uid = wrapper.getAttribute("data-uid");
+        if (uid) pendingFiles.delete(uid);
         wrapper.remove();
+        refreshAllPhotoToolbars();
         syncFallback();
       });
 
+      tools.appendChild(upBtn);
+      tools.appendChild(downBtn);
+      tools.appendChild(removeBtn);
+      toolbar.appendChild(sizes);
+      toolbar.appendChild(tools);
+      wrapper.appendChild(toolbar);
+      refreshPhotoToolbarState(wrapper);
+    }
+
+    function makeExistingPhotoBlock(filename, url, size) {
+      var wrapper = document.createElement("div");
+      wrapper.className = "rt-photo-existing";
+      wrapper.contentEditable = "false";
+      wrapper.setAttribute("data-filename", filename);
+      wrapper.setAttribute("data-size", size || "full");
+
+      var img = document.createElement("img");
+      img.src = url;
+      img.alt = "";
       wrapper.appendChild(img);
-      wrapper.appendChild(removeBtn);
+
+      attachPhotoToolbar(wrapper);
       return wrapper;
     }
+
+    var PHOTO_TOKEN_RE = /^\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]$/;
 
     function importContent(html, images) {
       richContent.innerHTML = html || "";
       var tokenParas = Array.prototype.filter.call(richContent.querySelectorAll("p"), function (p) {
-        return /^\[\[photo:\d+\]\]$/.test((p.textContent || "").trim());
+        return PHOTO_TOKEN_RE.test((p.textContent || "").trim());
       });
       tokenParas.forEach(function (p) {
-        var n = parseInt((p.textContent || "").trim().match(/\d+/)[0], 10);
+        var m = (p.textContent || "").trim().match(PHOTO_TOKEN_RE);
+        var n = parseInt(m[1], 10);
+        var size = m[2] || "full";
         var img = images && images[n - 1];
         if (img) {
-          p.replaceWith(makeExistingPhotoBlock(img.filename, img.url));
+          p.replaceWith(makeExistingPhotoBlock(img.filename, img.url, size));
         } else {
           var chip = document.createElement("div");
           chip.className = "rt-photo-chip";
@@ -667,6 +816,7 @@
           p.replaceWith(chip);
         }
       });
+      refreshAllPhotoToolbars();
     }
 
     if (fallback.value && fallback.value.trim()) {
@@ -750,10 +900,12 @@
           return;
         }
         var token = document.createElement("p");
+        var size = node.getAttribute("data-size") || "full";
+        var suffix = size !== "full" ? "|" + size : "";
         if (node.classList.contains("rt-photo-existing")) {
           photoIndex += 1;
           orderedRefs.push({ type: "existing", filename: node.getAttribute("data-filename") });
-          token.textContent = "[[photo:" + photoIndex + "]]";
+          token.textContent = "[[photo:" + photoIndex + suffix + "]]";
           node.replaceWith(token);
           return;
         }
@@ -764,7 +916,7 @@
         }
         photoIndex += 1;
         orderedRefs.push({ type: "new", uid: uid });
-        token.textContent = "[[photo:" + photoIndex + "]]";
+        token.textContent = "[[photo:" + photoIndex + suffix + "]]";
         node.replaceWith(token);
       });
 
@@ -1192,9 +1344,10 @@
       }
     });
 
-    // Builds the same managed "photo block" (thumbnail + remove button,
-    // registered in pendingFiles so it's included as a real upload on
-    // submit) regardless of whether it's going in at the cursor (toolbar /
+
+    // Builds the same managed "photo block" (thumbnail + size/move/remove
+    // toolbar, registered in pendingFiles so it's included as a real upload
+    // on submit) regardless of whether it's going in at the cursor (toolbar /
     // direct clipboard file) or replacing a specific node in place (a
     // recovered pasted image — see recoverStrayPastedImages below).
     function buildPhotoWrapper(file) {
@@ -1206,24 +1359,14 @@
       wrapper.className = "rt-photo";
       wrapper.contentEditable = "false";
       wrapper.setAttribute("data-uid", uid);
+      wrapper.setAttribute("data-size", "full");
 
       var img = document.createElement("img");
       img.src = url;
       img.alt = "";
-
-      var removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "rt-photo-remove";
-      removeBtn.setAttribute("aria-label", "Remove photo");
-      removeBtn.innerHTML = "&times;";
-      removeBtn.addEventListener("click", function () {
-        pendingFiles.delete(uid);
-        wrapper.remove();
-        syncFallback();
-      });
-
       wrapper.appendChild(img);
-      wrapper.appendChild(removeBtn);
+
+      attachPhotoToolbar(wrapper);
       return wrapper;
     }
 
@@ -1251,6 +1394,7 @@
       var wrapper = buildPhotoWrapper(file);
       node.replaceWith(wrapper);
       ensureTrailingParagraph(wrapper);
+      refreshAllPhotoToolbars();
     }
 
     function insertPhoto(file) {
@@ -1291,6 +1435,7 @@
       sel.addRange(caretRange);
 
       saveSelection();
+      refreshAllPhotoToolbars();
       syncFallback();
     }
 
@@ -1367,9 +1512,10 @@
       var buildPreviewBodyHTML = function () {
         var result = serialize();
         return result.html.replace(
-          /<p>\s*\[\[photo:(\d+)\]\]\s*<\/p>|\[\[photo:(\d+)\]\]/g,
-          function (whole, n1, n2) {
+          /<p>\s*\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]\s*<\/p>|\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]/g,
+          function (whole, n1, s1, n2, s2) {
             var n = parseInt(n1 || n2, 10);
+            var size = s1 || s2 || "full";
             var ref = result.orderedRefs[n - 1];
             if (!ref) return "";
             var url = "";
@@ -1383,7 +1529,7 @@
               url = file ? URL.createObjectURL(file) : "";
             }
             if (!url) return "";
-            return '<figure class="inline-photo"><img src="' + url + '" alt="Story photo ' + n + '" loading="lazy"></figure>';
+            return '<figure class="inline-photo inline-photo--' + size + '"><img src="' + url + '" alt="Story photo ' + n + '" loading="lazy"></figure>';
           }
         );
       };
