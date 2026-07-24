@@ -627,9 +627,15 @@
     // Shared toolbar attached under every inline photo block (both freshly
     // inserted and existing ones re-hydrated on load) — lets an author pick
     // a display size (small/medium/large/full, stored as [[photo:N|size]])
-    // and nudge the photo earlier/later among the story's other blocks,
-    // alongside the existing remove control.
+    // and an alignment (left/right float the photo so text wraps around
+    // it, or center — the default, unfloated block), plus nudge the photo
+    // earlier/later among the story's other blocks and remove it.
     var PHOTO_SIZES = [["small", "S"], ["medium", "M"], ["large", "L"], ["full", "Full"]];
+    var PHOTO_ALIGNS = [
+      ["left", "◀", "Move left — text wraps around it"],
+      ["center", "■", "Center (default, no wrap)"],
+      ["right", "▶", "Move right — text wraps around it"],
+    ];
 
     // A blank <p><br></p> spacer is auto-inserted after every photo purely
     // so the caret has somewhere to land (see ensureTrailingParagraph) — it
@@ -666,8 +672,12 @@
 
     function refreshPhotoToolbarState(wrapper) {
       var size = wrapper.getAttribute("data-size") || "full";
+      var align = wrapper.getAttribute("data-align") || "center";
       Array.prototype.forEach.call(wrapper.querySelectorAll("[data-size-btn]"), function (btn) {
         btn.classList.toggle("is-active", btn.getAttribute("data-size-btn") === size);
+      });
+      Array.prototype.forEach.call(wrapper.querySelectorAll("[data-align-btn]"), function (btn) {
+        btn.classList.toggle("is-active", btn.getAttribute("data-align-btn") === align);
       });
       var toolbar = wrapper.querySelector(".rt-photo-toolbar");
       if (!toolbar) return;
@@ -713,6 +723,7 @@
 
     function attachPhotoToolbar(wrapper) {
       if (!wrapper.getAttribute("data-size")) wrapper.setAttribute("data-size", "full");
+      if (!wrapper.getAttribute("data-align")) wrapper.setAttribute("data-align", "center");
 
       var toolbar = document.createElement("div");
       toolbar.className = "rt-photo-toolbar";
@@ -729,10 +740,38 @@
         btn.textContent = pair[1];
         btn.addEventListener("click", function () {
           wrapper.setAttribute("data-size", pair[0]);
+          // Full-width + floated is a contradiction (nothing left for text
+          // to wrap around), so picking Full also resets alignment back to
+          // center — mirrors the reverse guard in the align buttons below.
+          if (pair[0] === "full") wrapper.setAttribute("data-align", "center");
           refreshPhotoToolbarState(wrapper);
           syncFallback();
         });
         sizes.appendChild(btn);
+      });
+
+      var aligns = document.createElement("div");
+      aligns.className = "rt-photo-aligns";
+      PHOTO_ALIGNS.forEach(function (pair) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "rt-photo-align-btn";
+        btn.setAttribute("data-align-btn", pair[0]);
+        btn.title = pair[2];
+        btn.setAttribute("aria-label", pair[2]);
+        btn.textContent = pair[1];
+        btn.addEventListener("click", function () {
+          wrapper.setAttribute("data-align", pair[0]);
+          // Floating a full-width photo leaves no room for text to wrap
+          // into, so picking a side automatically narrows it to medium
+          // (unless it's already narrower) — matches the reverse guard above.
+          if (pair[0] !== "center" && wrapper.getAttribute("data-size") === "full") {
+            wrapper.setAttribute("data-size", "medium");
+          }
+          refreshPhotoToolbarState(wrapper);
+          syncFallback();
+        });
+        aligns.appendChild(btn);
       });
 
       var tools = document.createElement("div");
@@ -773,17 +812,19 @@
       tools.appendChild(downBtn);
       tools.appendChild(removeBtn);
       toolbar.appendChild(sizes);
+      toolbar.appendChild(aligns);
       toolbar.appendChild(tools);
       wrapper.appendChild(toolbar);
       refreshPhotoToolbarState(wrapper);
     }
 
-    function makeExistingPhotoBlock(filename, url, size) {
+    function makeExistingPhotoBlock(filename, url, size, align) {
       var wrapper = document.createElement("div");
       wrapper.className = "rt-photo-existing";
       wrapper.contentEditable = "false";
       wrapper.setAttribute("data-filename", filename);
       wrapper.setAttribute("data-size", size || "full");
+      wrapper.setAttribute("data-align", align || "center");
 
       var img = document.createElement("img");
       img.src = url;
@@ -794,7 +835,11 @@
       return wrapper;
     }
 
-    var PHOTO_TOKEN_RE = /^\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]$/;
+    // Size and align suffixes are each independently optional (and the
+    // photo-size and alignment keyword sets never overlap), so this parses
+    // every token shape that's ever been saved: bare, size-only, align-only,
+    // or both — matches the server's INLINE_PHOTO_RE in app/blog.py.
+    var PHOTO_TOKEN_RE = /^\[\[photo:(\d+)(?:\|(small|medium|large|full))?(?:\|(left|right|center))?\]\]$/;
 
     function importContent(html, images) {
       richContent.innerHTML = html || "";
@@ -805,9 +850,10 @@
         var m = (p.textContent || "").trim().match(PHOTO_TOKEN_RE);
         var n = parseInt(m[1], 10);
         var size = m[2] || "full";
+        var align = m[3] || "center";
         var img = images && images[n - 1];
         if (img) {
-          p.replaceWith(makeExistingPhotoBlock(img.filename, img.url, size));
+          p.replaceWith(makeExistingPhotoBlock(img.filename, img.url, size, align));
         } else {
           var chip = document.createElement("div");
           chip.className = "rt-photo-chip";
@@ -901,7 +947,8 @@
         }
         var token = document.createElement("p");
         var size = node.getAttribute("data-size") || "full";
-        var suffix = size !== "full" ? "|" + size : "";
+        var align = node.getAttribute("data-align") || "center";
+        var suffix = (size !== "full" ? "|" + size : "") + (align !== "center" ? "|" + align : "");
         if (node.classList.contains("rt-photo-existing")) {
           photoIndex += 1;
           orderedRefs.push({ type: "existing", filename: node.getAttribute("data-filename") });
@@ -1360,6 +1407,7 @@
       wrapper.contentEditable = "false";
       wrapper.setAttribute("data-uid", uid);
       wrapper.setAttribute("data-size", "full");
+      wrapper.setAttribute("data-align", "center");
 
       var img = document.createElement("img");
       img.src = url;
@@ -1511,11 +1559,15 @@
 
       var buildPreviewBodyHTML = function () {
         var result = serialize();
+        var tokenPattern =
+          "\\[\\[photo:(\\d+)(?:\\|(small|medium|large|full))?(?:\\|(left|right|center))?\\]\\]";
+        var re = new RegExp("<p>\\s*" + tokenPattern + "\\s*</p>|" + tokenPattern, "g");
         return result.html.replace(
-          /<p>\s*\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]\s*<\/p>|\[\[photo:(\d+)(?:\|(small|medium|large|full))?\]\]/g,
-          function (whole, n1, s1, n2, s2) {
+          re,
+          function (whole, n1, s1, a1, n2, s2, a2) {
             var n = parseInt(n1 || n2, 10);
             var size = s1 || s2 || "full";
+            var align = a1 || a2 || "center";
             var ref = result.orderedRefs[n - 1];
             if (!ref) return "";
             var url = "";
@@ -1529,7 +1581,8 @@
               url = file ? URL.createObjectURL(file) : "";
             }
             if (!url) return "";
-            return '<figure class="inline-photo inline-photo--' + size + '"><img src="' + url + '" alt="Story photo ' + n + '" loading="lazy"></figure>';
+            return '<figure class="inline-photo inline-photo--' + size + ' inline-photo--' + align +
+              '"><img src="' + url + '" alt="Story photo ' + n + '" loading="lazy"></figure>';
           }
         );
       };

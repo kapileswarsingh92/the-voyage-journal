@@ -606,20 +606,28 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .rt-photo[data-size="medium"], .rt-photo-existing[data-size="medium"] { max-width: 340px; }
 .rt-photo[data-size="large"], .rt-photo-existing[data-size="large"] { max-width: 480px; }
 .rt-photo[data-size="full"], .rt-photo-existing[data-size="full"] { max-width: 100%; }
+/* Left/right alignment floats the photo so following text wraps around it —
+   only makes visual sense for a photo narrower than the column, so the
+   editor auto-bumps size off "full" when you pick a side (see main.js). */
+.rt-photo[data-align="left"], .rt-photo-existing[data-align="left"] { float: left; margin: 4px 18px 14px 0; }
+.rt-photo[data-align="right"], .rt-photo-existing[data-align="right"] { float: right; margin: 4px 0 14px 18px; }
 .rt-photo img, .rt-photo-existing img { width: 100%; border-radius: var(--radius); display: block; }
+.rich-content:after { content: ""; display: table; clear: both; }
 
-/* Toolbar under each inline photo in the editor: size picker + move + remove */
+/* Toolbar under each inline photo in the editor: size + align picker + move + remove */
 .rt-photo-toolbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px;
   margin-top: 6px; padding: 4px 6px; border-radius: 999px; background: var(--cream-2);
 }
-.rt-photo-sizes, .rt-photo-tools { display: flex; align-items: center; gap: 2px; }
-.rt-photo-size-btn {
+.rt-photo-sizes, .rt-photo-aligns, .rt-photo-tools { display: flex; align-items: center; gap: 2px; }
+.rt-photo-sizes { border-right: 1px solid var(--line); padding-right: 6px; margin-right: 2px; }
+.rt-photo-size-btn, .rt-photo-align-btn {
   border: none; background: transparent; border-radius: 999px; padding: 4px 10px;
   font-size: .72rem; font-weight: 600; color: var(--ink-faint); cursor: pointer; line-height: 1.4;
 }
-.rt-photo-size-btn:hover { background: rgba(20,15,12,.08); color: var(--ink); }
-.rt-photo-size-btn.is-active { background: var(--ink); color: var(--paper); }
+.rt-photo-align-btn { padding: 4px 8px; font-size: .85rem; }
+.rt-photo-size-btn:hover, .rt-photo-align-btn:hover { background: rgba(20,15,12,.08); color: var(--ink); }
+.rt-photo-size-btn.is-active, .rt-photo-align-btn.is-active { background: var(--ink); color: var(--paper); }
 .rt-photo-move, .rt-photo-remove {
   border: none; background: transparent; border-radius: 50%; width: 26px; height: 26px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -644,6 +652,13 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .inline-photo--medium { max-width: 520px; margin-left: auto; margin-right: auto; }
 .inline-photo--large { max-width: 760px; margin-left: auto; margin-right: auto; }
 .inline-photo--full { max-width: 100%; }
+/* Alignment margin/float rules come after the size rules above so they win
+   the (shorthand) margin cascade when both apply — e.g. a medium photo
+   aligned right keeps medium's max-width but gets float's margin, not
+   medium's centering margin. */
+.inline-photo--left { float: left; margin: 6px 28px 20px 0; }
+.inline-photo--right { float: right; margin: 6px 0 20px 28px; }
+.post-content:after { content: ""; display: table; clear: both; }
 
 /* ---------- "Preview my story" modal (submit / edit pages) ---------- */
 .preview-modal-overlay {

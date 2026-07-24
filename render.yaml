@@ -13,7 +13,11 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn run:app
+    # --timeout 150: a low-resolution photo gets AI-upscaled (see
+    # REPLICATE_API_TOKEN below) before it's saved, which can take up to
+    # ~90s in the worst case (cold-start included) — gunicorn's default
+    # 30s worker timeout would kill that request partway through.
+    startCommand: gunicorn run:app --timeout 150
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -23,6 +27,13 @@ services:
         value: /var/data/uploads
       - key: PYTHON_VERSION
         value: 3.11.9
+      # Optional: enables automatic AI upscaling of low-resolution photos
+      # (via Replicate's Real-ESRGAN model) on upload. Leave unset and the
+      # site behaves exactly as before — small photos are saved as-is.
+      # Set your own key in the Render dashboard; sync: false keeps it out
+      # of this file / git.
+      - key: REPLICATE_API_TOKEN
+        sync: false
     disk:
       name: voyage-journal-data
       mountPath: /var/data

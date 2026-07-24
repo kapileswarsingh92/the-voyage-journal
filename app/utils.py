@@ -1,11 +1,17 @@
+import base64
 import functools
 import html as html_lib
+import io
+import logging
+import os
 import re
 import secrets
+import time
 import unicodedata
 from html.parser import HTMLParser
 from pathlib import Path
 
+import requests
 from flask import (
     current_app,
     flash,
@@ -22,11 +28,82 @@ from .db import get_db
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 # Sized generously for quality (retina-sharp on large screens) while still
 # capping how heavy a single photo/page can get. Anything larger than these
-# is downsized on save; nothing smaller is ever upscaled.
+# is downsized on save. Anything smaller gets AI-upscaled first (see
+# _ai_upscale below) when it's below UPSCALE_MIN_DIMENSION, then capped down
+# to these same limits like everything else.
 COVER_MAX_SIZE = (3000, 1875)
 GALLERY_MAX_SIZE = (2600, 2600)
 MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50MB per photo (cover or gallery) — effectively unlimited for real photos
 MAX_GALLERY_IMAGES = 10
+
+# ---------------------------------------------------------------------------
+# AI upscaling for low-resolution photos (Replicate / Real-ESRGAN)
+# ---------------------------------------------------------------------------
+# A photo whose longer edge is under this is treated as "low quality" and
+# sent through Real-ESRGAN before the normal resize/save step, so it ends up
+# sharper and closer to our usual display size instead of looking soft or
+# undersized next to everything else. Entirely optional: with no
+# REPLICATE_API_TOKEN set, this is a no-op and photos are saved exactly as
+# before. Any failure (missing key, network error, timeout, bad response)
+# falls back to the original photo — this must never block an upload.
+_upscale_logger = logging.getLogger("voyage_journal.upscale")
+REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
+REPLICATE_MODEL = "nightmareai/real-esrgan"
+UPSCALE_MIN_DIMENSION = 1200
+UPSCALE_INITIAL_TIMEOUT = 65  # seconds — covers Replicate's own up-to-60s "Prefer: wait" hold
+UPSCALE_POLL_TIMEOUT = 30  # seconds — extra time we'll keep polling if it's still running after that
+
+
+def _ai_upscale(image: Image.Image) -> Image.Image | None:
+    """Sends a low-resolution photo to Real-ESRGAN via the Replicate API and
+    returns the upscaled result, or None if it's unconfigured, fails, or
+    times out — callers fall back to the original photo in that case."""
+    if not REPLICATE_API_TOKEN:
+        return None
+    try:
+        buf = io.BytesIO()
+        rgb_image = image.convert("RGB") if image.mode != "RGB" else image
+        rgb_image.save(buf, format="PNG")
+        data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+        headers = {
+            "Authorization": f"Bearer {REPLICATE_API_TOKEN}",
+            "Content-Type": "application/json",
+            "Prefer": "wait",
+        }
+        resp = requests.post(
+            f"https://api.replicate.com/v1/models/{REPLICATE_MODEL}/predictions",
+            headers=headers,
+            json={"input": {"image": data_uri, "scale": 4, "face_enhance": False}},
+            timeout=UPSCALE_INITIAL_TIMEOUT,
+        )
+        resp.raise_for_status()
+        prediction = resp.json()
+
+        get_url = (prediction.get("urls") or {}).get("get")
+        deadline = time.monotonic() + UPSCALE_POLL_TIMEOUT
+        while prediction.get("status") in ("starting", "processing") and get_url and time.monotonic() < deadline:
+            time.sleep(2)
+            poll = requests.get(get_url, headers=headers, timeout=20)
+            poll.raise_for_status()
+            prediction = poll.json()
+
+        if prediction.get("status") != "succeeded":
+            _upscale_logger.warning("Replicate upscale did not succeed: status=%r", prediction.get("status"))
+            return None
+
+        output = prediction.get("output")
+        if isinstance(output, list):
+            output = output[0] if output else None
+        if not output or not isinstance(output, str):
+            return None
+
+        img_resp = requests.get(output, timeout=60)
+        img_resp.raise_for_status()
+        return Image.open(io.BytesIO(img_resp.content))
+    except Exception:
+        _upscale_logger.exception("AI photo upscaling failed; using the original photo instead.")
+        return None
 
 
 def slugify(text: str) -> str:
@@ -81,6 +158,14 @@ def save_image(file_storage, max_size=COVER_MAX_SIZE) -> str | None:
         image = ImageOps.exif_transpose(image)
         if image.mode not in ("RGB", "RGBA"):
             image = image.convert("RGB")
+
+        if ext != "gif" and max(image.size) < UPSCALE_MIN_DIMENSION:
+            upscaled = _ai_upscale(image)
+            if upscaled is not None:
+                image = upscaled
+                if image.mode not in ("RGB", "RGBA"):
+                    image = image.convert("RGB")
+
         image.thumbnail(max_size, Image.LANCZOS)
         save_kwargs = {"quality": 87, "optimize": True} if ext in ("jpg", "webp") else {}
         image.save(dest, **save_kwargs)
