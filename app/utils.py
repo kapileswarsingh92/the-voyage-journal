@@ -26,7 +26,7 @@ ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 COVER_MAX_SIZE = (3000, 1875)
 GALLERY_MAX_SIZE = (2600, 2600)
 MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50MB per photo (cover or gallery) — effectively unlimited for real photos
-MAX_GALLERY_IMAGES = 8
+MAX_GALLERY_IMAGES = 10
 
 
 def slugify(text: str) -> str:
