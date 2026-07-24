@@ -967,17 +967,129 @@
       return richContent.querySelectorAll(".rt-photo, .rt-photo-existing").length;
     }
 
-    function cleanUpStrayPastedImages() {
-      var strays = Array.prototype.filter.call(richContent.querySelectorAll("img"), function (img) {
+    function strayPastedImages() {
+      return Array.prototype.filter.call(richContent.querySelectorAll("img"), function (img) {
         return !img.closest(".rt-photo, .rt-photo-existing, .rt-photo-chip");
       });
+    }
+
+    function markUnrecoverable(node) {
+      var chip = document.createElement("div");
+      chip.className = "rt-photo-chip";
+      chip.contentEditable = "false";
+      chip.textContent = "📷 An image from your paste couldn't be attached automatically — please use “Insert photo” to add it.";
+      node.replaceWith(chip);
+    }
+
+    // Used only when we already grabbed this paste's image(s) directly from
+    // the clipboard's file list (see the "imageFiles.length" branch below) —
+    // any <img> still sitting in the pasted HTML at that point is assumed to
+    // be a duplicate reference to a photo already attached that way, so it's
+    // just silently dropped rather than shown as an (inaccurate) "couldn't
+    // be attached" notice.
+    function stripDuplicateStrayImages() {
+      strayPastedImages().forEach(function (img) { img.remove(); });
+    }
+
+    // Turns a data: URI back into a real File the same way a direct
+    // clipboard file would arrive as — fetch() happily reads a data: URI
+    // (no network involved, purely local), giving back the actual image
+    // bytes to hand to the normal upload/crop pipeline.
+    function dataUriToFile(dataUri) {
+      return fetch(dataUri)
+        .then(function (res) { return res.blob(); })
+        .then(function (blob) {
+          var ext = (blob.type.split("/")[1] || "png").split("+")[0];
+          return new File([blob], "pasted-image." + ext, { type: blob.type || "image/png" });
+        })
+        .catch(function () { return null; });
+    }
+
+    // A paste's `input` event fires synchronously as part of the browser's
+    // native paste — which runs syncFallback → serialize →
+    // normalizeLooseTopLevelNodes *before* this function's setTimeout(0)
+    // ever gets a turn. That normalizer wraps any loose (non-block) node,
+    // including a bare pasted <img>, in a synthetic <p> — perfectly fine
+    // for the eventual "couldn't be attached" text notice, but NOT for a
+    // real photo block, which (like insertPhoto's cursor-based placement)
+    // must always be a direct child of the editor, never nested inside a
+    // paragraph, or the [[photo:N]] token swap in serialize() ends up
+    // nested too (a stray extra <p> wrapping the token). This moves `node`
+    // back out to top level first, removing the wrapper it leaves behind
+    // if that wrapper's now otherwise empty.
+    function hoistNodeToTopLevel(node) {
+      if (node.parentNode === richContent) return;
+      var oldParent = node.parentNode;
+      var anchor = oldParent;
+      while (anchor && anchor.parentNode !== richContent) {
+        anchor = anchor.parentNode;
+      }
+      if (anchor && anchor.parentNode === richContent) {
+        richContent.insertBefore(node, anchor.nextSibling);
+      } else {
+        richContent.appendChild(node);
+      }
+      if (
+        oldParent !== richContent && oldParent.isConnected &&
+        !(oldParent.textContent || "").trim() &&
+        !oldParent.querySelector("img, .rt-photo, .rt-photo-existing, .rt-photo-chip")
+      ) {
+        oldParent.remove();
+      }
+    }
+
+    // Used when the clipboard didn't expose the pasted image(s) as their
+    // own file items (common for Word/Pages on Mac, which instead embeds a
+    // copied image as a data: URI right inside the pasted HTML) — rather
+    // than give up right away, each stray <img> left behind by the native
+    // paste is inspected: a data: URI is recovered into a real file and
+    // swapped in for a proper managed photo block, same as "Insert photo";
+    // anything else (a file:// or blob: reference, which script has no way
+    // to read actual bytes back out of — the common case for Word on
+    // Windows) gets the honest "couldn't be attached" notice instead.
+    function recoverStrayPastedImages() {
+      var strays = strayPastedImages();
+      if (!strays.length) return;
+
+      var room = maxGalleryImages ? Math.max(maxGalleryImages - currentPhotoCount(), 0) : Infinity;
+      var overLimit = 0;
+
       strays.forEach(function (img) {
-        var chip = document.createElement("div");
-        chip.className = "rt-photo-chip";
-        chip.contentEditable = "false";
-        chip.textContent = "📷 An image from your paste couldn't be attached automatically — please use “Insert photo” to add it.";
-        img.replaceWith(chip);
+        var src = img.src || "";
+        if (src.indexOf("data:image/") !== 0) {
+          markUnrecoverable(img);
+          return;
+        }
+        if (room <= 0) {
+          overLimit += 1;
+          markUnrecoverable(img);
+          return;
+        }
+        room -= 1;
+
+        hoistNodeToTopLevel(img);
+        var placeholder = document.createElement("div");
+        placeholder.className = "rt-photo-chip";
+        placeholder.contentEditable = "false";
+        placeholder.textContent = "📷 Attaching pasted image…";
+        img.replaceWith(placeholder);
+
+        dataUriToFile(src).then(function (file) {
+          if (file) {
+            replacePastedImageInPlace(placeholder, file);
+          } else {
+            markUnrecoverable(placeholder);
+          }
+          syncFallback();
+        });
       });
+
+      if (overLimit) {
+        window.alert(
+          "This story can have up to " + maxGalleryImages + " photos in total, so " +
+          overLimit + " pasted image(s) weren't added. Remove a photo, then use “Insert photo” to add the rest."
+        );
+      }
     }
 
     richContent.addEventListener("paste", function (e) {
@@ -994,11 +1106,13 @@
       }
 
       if (!imageFiles.length) {
-        // No recoverable image bytes on the clipboard — let the browser's
-        // normal rich paste bring in text, formatting and tables as-is,
-        // then just sweep up any orphaned <img> reference afterwards.
+        // The clipboard didn't hand us the image as its own file — let the
+        // browser's normal rich paste bring in text, formatting and tables
+        // as-is, then try to recover any image(s) that came along embedded
+        // as a data: URI right in that pasted HTML (see
+        // recoverStrayPastedImages for why this two-step is needed).
         setTimeout(function () {
-          cleanUpStrayPastedImages();
+          recoverStrayPastedImages();
           syncFallback();
         }, 0);
         return;
@@ -1021,7 +1135,7 @@
       // The HTML we just inserted may itself reference the same images
       // (Word/Pages often includes both) — strip those so nothing ends up
       // attached twice.
-      cleanUpStrayPastedImages();
+      stripDuplicateStrayImages();
 
       var room = maxGalleryImages ? maxGalleryImages - currentPhotoCount() : imageFiles.length;
       room = Math.max(room, 0);
@@ -1078,7 +1192,12 @@
       }
     });
 
-    function insertPhoto(file) {
+    // Builds the same managed "photo block" (thumbnail + remove button,
+    // registered in pendingFiles so it's included as a real upload on
+    // submit) regardless of whether it's going in at the cursor (toolbar /
+    // direct clipboard file) or replacing a specific node in place (a
+    // recovered pasted image — see recoverStrayPastedImages below).
+    function buildPhotoWrapper(file) {
       var uid = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
       pendingFiles.set(uid, file);
       var url = URL.createObjectURL(file);
@@ -1105,6 +1224,37 @@
 
       wrapper.appendChild(img);
       wrapper.appendChild(removeBtn);
+      return wrapper;
+    }
+
+    // Makes sure there's a paragraph right after a just-placed photo block
+    // so there's always somewhere for the caret to land / keep typing into.
+    function ensureTrailingParagraph(wrapper) {
+      var nextEl = wrapper.nextSibling;
+      var nextIsBlock = nextEl && nextEl.nodeType === Node.ELEMENT_NODE &&
+        ["P", "DIV", "UL", "OL"].indexOf(nextEl.tagName) !== -1;
+      if (!nextIsBlock) {
+        var freshPara = document.createElement("p");
+        freshPara.appendChild(document.createElement("br"));
+        richContent.insertBefore(freshPara, wrapper.nextSibling);
+        nextEl = freshPara;
+      }
+      return nextEl;
+    }
+
+    // Replaces a specific node (a stray pasted <img>, or the "attaching…"
+    // placeholder standing in for it) with a real managed photo block, in
+    // that exact spot — used when recovering an image that arrived as a
+    // data: URI embedded in pasted HTML rather than as its own clipboard
+    // file (see recoverStrayPastedImages).
+    function replacePastedImageInPlace(node, file) {
+      var wrapper = buildPhotoWrapper(file);
+      node.replaceWith(wrapper);
+      ensureTrailingParagraph(wrapper);
+    }
+
+    function insertPhoto(file) {
+      var wrapper = buildPhotoWrapper(file);
 
       // Walk up from the cursor to whichever node is a direct child of the
       // editor (a <p>, <ul>, ...) so the photo always lands as its own
@@ -1132,16 +1282,7 @@
         richContent.appendChild(wrapper);
       }
 
-      // Make sure there's a paragraph right after the photo to keep typing into.
-      var nextEl = wrapper.nextSibling;
-      var nextIsBlock = nextEl && nextEl.nodeType === Node.ELEMENT_NODE &&
-        ["P", "DIV", "UL", "OL"].indexOf(nextEl.tagName) !== -1;
-      if (!nextIsBlock) {
-        var freshPara = document.createElement("p");
-        freshPara.appendChild(document.createElement("br"));
-        richContent.insertBefore(freshPara, wrapper.nextSibling);
-        nextEl = freshPara;
-      }
+      var nextEl = ensureTrailingParagraph(wrapper);
 
       var caretRange = document.createRange();
       caretRange.selectNodeContents(nextEl);
