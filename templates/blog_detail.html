@@ -50,7 +50,7 @@
     </div>
   </header>
 
-  <div class="wrap post-layout">
+  <div class="wrap post-layout{% if not related %} post-layout--solo{% endif %}">
     <div class="post-body">
       <div class="post-content">{{ post.content_html | safe }}</div>
 
@@ -144,13 +144,8 @@
       {% endif %}
     </div>
 
+    {% if related %}
     <aside class="post-sidebar">
-      <div class="sidebar-card">
-        <h4>Written by</h4>
-        <p class="author-name">{{ post.author_name }}</p>
-        {% if post.location %}<p class="author-loc">📍 {{ post.location }}</p>{% endif %}
-      </div>
-      {% if related %}
       <div class="sidebar-card">
         <h4>More in {{ post.category }}</h4>
         {% for r in related %}
@@ -160,20 +155,8 @@
         </a>
         {% endfor %}
       </div>
-      {% endif %}
-      <div class="sidebar-card sidebar-cta">
-        <h4>Write for the journal</h4>
-        <p>Share your own trip or lifestyle story — no account needed to submit.</p>
-        <a class="btn btn-primary btn-sm" href="{{ url_for('blog.submit') }}">Submit a story</a>
-      </div>
-      {% if current_user and current_user['id'] == post.submitted_by_user_id %}
-      <div class="sidebar-card">
-        <h4>Your story</h4>
-        <p>{{ post.view_count }} view{{ 's' if post.view_count != 1 }} · {{ post.share_count }} share{{ 's' if post.share_count != 1 }}</p>
-        <a class="btn btn-outline btn-sm" href="{{ url_for('blog.edit', slug=post.slug) }}">Edit this story</a>
-      </div>
-      {% endif %}
     </aside>
+    {% endif %}
   </div>
 
   {% if gallery %}

@@ -369,6 +369,10 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .post-header:not(:has(.post-header-media)) { background: var(--teal); color: var(--paper); min-height: auto; padding: 20px 0; }
 
 .post-layout { display: grid; grid-template-columns: 1fr 300px; gap: 50px; padding: 50px 28px 80px; align-items: start; }
+/* When there's no sidebar content (no related stories to show), collapse to
+   a single, centered column instead of leaving the 300px sidebar track (or
+   a big empty margin) next to the article. */
+.post-layout--solo { grid-template-columns: minmax(0, 760px); justify-content: center; }
 .post-content {
   font-family: 'Times New Roman', Times, serif; font-size: 1.08rem; line-height: 1.78; color: var(--ink); max-width: 68ch;
 }
