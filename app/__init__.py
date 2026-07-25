@@ -61,6 +61,12 @@ def create_app(test_config=None):
         with app.app_context():
             db_module.init_db()
 
+    # Runs unconditionally (unlike init_db above) so a schema addition like
+    # this one also reaches a database that already exists — see
+    # ensure_post_pdfs_table's docstring.
+    with app.app_context():
+        db_module.ensure_post_pdfs_table()
+
     from . import auth, blog, admin
 
     app.register_blueprint(auth.bp)

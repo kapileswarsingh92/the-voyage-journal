@@ -188,6 +188,57 @@ def save_gallery_images(file_storages) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# PDF attachments — inserted inline in a story (like a photo) but kept as
+# the original file and shown as a download card rather than processed.
+# ---------------------------------------------------------------------------
+
+ALLOWED_PDF_EXTENSIONS = {"pdf"}
+MAX_PDF_BYTES = 20 * 1024 * 1024  # 20MB per PDF
+MAX_STORY_PDFS = 5
+
+
+def allowed_pdf(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_PDF_EXTENSIONS
+
+
+def save_pdf(file_storage) -> dict | None:
+    """Validate and save an uploaded PDF as-is (no processing, unlike
+    photos). Returns {"filename": <random stored name>, "original_filename":
+    <name to show/download as>}, or None."""
+    if not file_storage or not file_storage.filename:
+        return None
+    if not allowed_pdf(file_storage.filename):
+        raise ValueError(f'"{file_storage.filename}" isn\'t a PDF.')
+    if _file_size(file_storage) > MAX_PDF_BYTES:
+        raise ValueError(f'"{file_storage.filename}" is larger than the 20MB limit per PDF.')
+    header = file_storage.stream.read(5)
+    file_storage.stream.seek(0)
+    if header != b"%PDF-":
+        raise ValueError(f'"{file_storage.filename}" doesn\'t look like a valid PDF.')
+
+    fname = f"{secrets.token_hex(12)}.pdf"
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_storage.save(upload_dir / fname)
+    original = Path(file_storage.filename).name  # defensively strip any path components
+    return {"filename": fname, "original_filename": original}
+
+
+def save_pdfs(file_storages) -> list[dict]:
+    """Save up to MAX_STORY_PDFS PDFs. Returns a list of the same dicts
+    save_pdf() returns, in the order given."""
+    files = [f for f in (file_storages or []) if f and f.filename]
+    if len(files) > MAX_STORY_PDFS:
+        raise ValueError(f"You can attach up to {MAX_STORY_PDFS} PDFs per story.")
+    out = []
+    for f in files:
+        saved = save_pdf(f)
+        if saved:
+            out.append(saved)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
 
@@ -414,8 +465,11 @@ def looks_like_html(raw: str) -> bool:
 def strip_story_html(html_content: str) -> str:
     """Plain-text length of a (sanitized) story body — used for the
     minimum-length validation and as a fallback when generating an excerpt,
-    so neither counts HTML tag characters as if they were prose."""
+    so neither counts HTML tag characters, or inline [[photo:N|size|align]]
+    / [[pdf:N]] placement tokens, as if they were prose. The photo pattern
+    mirrors blog.py's INLINE_PHOTO_RE (bare, size-only, or size+align)."""
     text = re.sub(r"<[^>]+>", " ", html_content or "")
     text = html_lib.unescape(text)
-    text = re.sub(r"\[\[photo:\d+\]\]", " ", text)
+    text = re.sub(r"\[\[photo:\d+(?:\|(?:small|medium|large|full))?(?:\|(?:left|right|center))?\]\]", " ", text)
+    text = re.sub(r"\[\[pdf:\d+\]\]", " ", text)
     return re.sub(r"\s+", " ", text).strip()

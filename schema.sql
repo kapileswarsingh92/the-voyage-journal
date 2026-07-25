@@ -4,6 +4,7 @@ PRAGMA foreign_keys = ON;
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS likes;
 DROP TABLE IF EXISTS post_images;
+DROP TABLE IF EXISTS post_pdfs;
 DROP TABLE IF EXISTS posts;
 DROP TABLE IF EXISTS users;
 
@@ -47,6 +48,15 @@ CREATE TABLE post_images (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE post_pdfs (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id           INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    filename          TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    position          INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE likes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id    INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -69,3 +79,4 @@ CREATE INDEX idx_posts_category ON posts(category);
 CREATE INDEX idx_likes_post ON likes(post_id);
 CREATE INDEX idx_comments_post ON comments(post_id);
 CREATE INDEX idx_post_images_post ON post_images(post_id, position);
+CREATE INDEX idx_post_pdfs_post ON post_pdfs(post_id, position);

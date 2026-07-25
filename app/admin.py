@@ -160,9 +160,15 @@ def delete(post_id):
     if post["cover_image"]:
         candidate_filenames.add(post["cover_image"])
 
-    # Deleting the post row cascades to its likes/comments/post_images rows
-    # (all declared ON DELETE CASCADE in schema.sql), but the actual image
-    # files on disk need removing separately.
+    pdf_gallery = db.execute(
+        "SELECT filename FROM post_pdfs WHERE post_id = ?", (post_id,)
+    ).fetchall()
+    candidate_pdf_filenames = {row["filename"] for row in pdf_gallery}
+
+    # Deleting the post row cascades to its likes/comments/post_images/
+    # post_pdfs rows (all declared ON DELETE CASCADE in schema.sql /
+    # ensure_post_pdfs_table), but the actual files on disk need removing
+    # separately.
     db.execute("DELETE FROM posts WHERE id = ?", (post_id,))
     db.commit()
 
@@ -176,6 +182,20 @@ def delete(post_id):
                 "SELECT 1 FROM posts WHERE cover_image = ? "
                 "UNION SELECT 1 FROM post_images WHERE filename = ? LIMIT 1",
                 (filename, filename),
+            ).fetchone()
+            if still_used:
+                continue
+            file_path = upload_dir / filename
+            try:
+                file_path.unlink(missing_ok=True)
+            except OSError:
+                pass  # best-effort cleanup; the DB delete already succeeded
+
+    if candidate_pdf_filenames:
+        upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
+        for filename in candidate_pdf_filenames:
+            still_used = db.execute(
+                "SELECT 1 FROM post_pdfs WHERE filename = ? LIMIT 1", (filename,)
             ).fetchone()
             if still_used:
                 continue
