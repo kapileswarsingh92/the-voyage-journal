@@ -190,87 +190,6 @@ def save_gallery_images(file_storages) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# File attachments — inserted inline in a story (like a photo) but kept as
-# the original file and shown as a download card rather than processed.
-# Started out PDF-only (hence names like save_pdf/[[pdf:N]]/post_pdfs
-# throughout the codebase), then broadened to also accept Word and Pages
-# documents. Renaming the DB table/token format wasn't worth the churn once
-# they were already load-bearing elsewhere, so "pdf" in an identifier now
-# means "attached story file" in general — read it that way below.
-# ---------------------------------------------------------------------------
-
-ALLOWED_PDF_EXTENSIONS = {"pdf", "doc", "docx", "pages"}
-MAX_PDF_BYTES = 20 * 1024 * 1024  # 20MB per file
-MAX_STORY_PDFS = 5
-
-# Per-extension "does this look like a real file of that type" check, since
-# a renamed .exe or similar shouldn't sail through just because its name
-# ends in .docx. PDF has a plain text signature; docx/pages are zip
-# archives under the hood; legacy .doc is an OLE compound-file document.
-_FILE_MAGIC_CHECKS = {
-    "pdf": lambda header: header.startswith(b"%PDF-"),
-    "docx": lambda header: header.startswith(b"PK"),
-    "pages": lambda header: header.startswith(b"PK"),
-    "doc": lambda header: header.startswith(b"\xd0\xcf\x11\xe0"),
-}
-
-# Shown in the small badge on each attachment card — collapses doc/docx to
-# one label since readers don't care which Word format it is.
-FILE_BADGE_LABELS = {"pdf": "PDF", "doc": "DOC", "docx": "DOC", "pages": "PAGES"}
-
-
-def file_badge_label(filename: str) -> str:
-    """The short badge text (PDF / DOC / PAGES) for an attached file, based
-    on its stored extension. Used both when rendering a published story and
-    when re-deriving a badge for an already-saved attachment."""
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    return FILE_BADGE_LABELS.get(ext, "FILE")
-
-
-def allowed_pdf(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_PDF_EXTENSIONS
-
-
-def save_pdf(file_storage) -> dict | None:
-    """Validate and save an uploaded PDF/Word/Pages file as-is (no
-    processing, unlike photos). Returns {"filename": <random stored name,
-    with the original extension preserved>, "original_filename": <name to
-    show/download as>}, or None."""
-    if not file_storage or not file_storage.filename:
-        return None
-    if not allowed_pdf(file_storage.filename):
-        raise ValueError(f'"{file_storage.filename}" isn\'t a supported file type (PDF, Word, or Pages).')
-    if _file_size(file_storage) > MAX_PDF_BYTES:
-        raise ValueError(f'"{file_storage.filename}" is larger than the 20MB limit per file.')
-    ext = file_storage.filename.rsplit(".", 1)[1].lower()
-    header = file_storage.stream.read(8)
-    file_storage.stream.seek(0)
-    if not _FILE_MAGIC_CHECKS[ext](header):
-        raise ValueError(f'"{file_storage.filename}" doesn\'t look like a valid {ext.upper()} file.')
-
-    fname = f"{secrets.token_hex(12)}.{ext}"
-    upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    file_storage.save(upload_dir / fname)
-    original = Path(file_storage.filename).name  # defensively strip any path components
-    return {"filename": fname, "original_filename": original}
-
-
-def save_pdfs(file_storages) -> list[dict]:
-    """Save up to MAX_STORY_PDFS files. Returns a list of the same dicts
-    save_pdf() returns, in the order given."""
-    files = [f for f in (file_storages or []) if f and f.filename]
-    if len(files) > MAX_STORY_PDFS:
-        raise ValueError(f"You can attach up to {MAX_STORY_PDFS} files per story.")
-    out = []
-    for f in files:
-        saved = save_pdf(f)
-        if saved:
-            out.append(saved)
-    return out
-
-
-# ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
 
@@ -348,6 +267,10 @@ def validate_csrf(form) -> bool:
 
 _STORY_ALLOWED_TAGS = {
     "p", "div", "br", "b", "strong", "i", "em", "ul", "ol", "li", "span",
+    # Underline — "u" is what execCommand("underline") actually emits, a
+    # plain attribute-less tag handled by the same generic branch as
+    # b/i/strong/em below, nothing else to special-case.
+    "u",
     # Table tags: kept as themselves (not unwrapped to <p> like a bare <div>)
     # so a table pasted in from Word/Pages/Excel keeps its grid structure
     # instead of collapsing into a run of plain paragraphs.
@@ -497,9 +420,12 @@ def looks_like_html(raw: str) -> bool:
 def strip_story_html(html_content: str) -> str:
     """Plain-text length of a (sanitized) story body — used for the
     minimum-length validation and as a fallback when generating an excerpt,
-    so neither counts HTML tag characters, or inline [[photo:N|size|align]]
-    / [[pdf:N]] placement tokens, as if they were prose. The photo pattern
-    mirrors blog.py's INLINE_PHOTO_RE (bare, size-only, or size+align)."""
+    so neither counts HTML tag characters or inline [[photo:N|size|align]]
+    placement tokens as if they were prose. The photo pattern mirrors
+    blog.py's INLINE_PHOTO_RE (bare, size-only, or size+align). The
+    [[pdf:N]] pattern is a legacy leftover from the since-removed file-
+    attachment feature — kept here purely so a story saved while that
+    feature still existed doesn't have a stray token counted as prose."""
     text = re.sub(r"<[^>]+>", " ", html_content or "")
     text = html_lib.unescape(text)
     text = re.sub(r"\[\[photo:\d+(?:\|(?:small|medium|large|full))?(?:\|(?:left|right|center))?\]\]", " ", text)

@@ -69,22 +69,6 @@
       </section>
       {% endif %}
 
-      {% if leftover_pdfs %}
-      <section class="post-pdfs-section">
-        <h3>Documents</h3>
-        <div class="post-pdfs-list">
-          {% for pdf in leftover_pdfs %}
-          <a class="pdf-attachment" href="{{ url_for('uploaded_file', filename=pdf.filename) }}"
-             download="{{ pdf.original_filename }}" target="_blank" rel="noopener">
-            <span class="pdf-attachment-icon" aria-hidden="true">{{ pdf.filename | file_badge_label }}</span>
-            <span class="pdf-attachment-name">{{ pdf.original_filename }}</span>
-            <span class="pdf-attachment-cta">Download</span>
-          </a>
-          {% endfor %}
-        </div>
-      </section>
-      {% endif %}
-
       {% if not preview %}
       <div class="post-actions" id="engage">
         <form method="post" action="{{ url_for('blog.like', slug=post.slug) }}" class="like-form" data-like-form>

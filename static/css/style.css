@@ -570,10 +570,24 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .js-rich-active [data-rich-editor] { display: block; }
 
 .rich-editor {
-  border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--paper); overflow: hidden;
+  border: 1.5px solid var(--line); border-radius: var(--radius); background: var(--paper);
+  /* No longer overflow:hidden — that clipped the toolbar's square corners
+     to match this box's rounded border, but it also silently breaks
+     position:sticky on anything nested inside it (any ancestor with
+     overflow != visible constrains — and effectively defeats — a sticky
+     descendant's range). Round the toolbar's own top corners instead so
+     the box still looks right without an overflow-hidden ancestor. */
 }
 .rich-toolbar {
-  display: flex; align-items: center; gap: 4px; padding: 8px 10px; background: var(--cream-2); border-bottom: 1px solid var(--line-soft);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 4px; padding: 8px 10px; background: var(--cream-2); border-bottom: 1px solid var(--line-soft);
+  border-radius: var(--radius) var(--radius) 0 0;
+  /* Follows you down the page while writing a long story, docking just
+     below the sticky site header (96px, matching .filters/.post-sidebar)
+     instead of scrolling out of view — it un-sticks naturally once the
+     whole editor box scrolls past, same as any sticky element confined to
+     its own container. Wraps onto a second line on narrower screens/boxes
+     now that it holds more buttons than it used to. */
+  position: sticky; top: 96px; z-index: 50;
 }
 .rich-toolbar button {
   font-family: var(--font-sans); font-size: .85rem; background: transparent; border: 1px solid transparent; border-radius: var(--radius);
@@ -581,8 +595,12 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 }
 .rich-toolbar button:hover { background: var(--paper); border-color: var(--line); color: var(--ink); }
 .rich-toolbar-sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; }
-.rich-toolbar-photo { font-weight: 600; margin-left: auto; }
-.rich-toolbar-pdf { margin-left: 8px; }
+/* No longer pushed to the far right with margin-left:auto — with an extra
+   format button added (underline) the toolbar can wrap onto a second line
+   on narrower boxes, and an auto-margin push left an awkward gap on the
+   wrapped line. Left-to-right flow plus the existing separators reads
+   cleanly either way. */
+.rich-toolbar-photo { font-weight: 600; }
 .rich-toolbar-select {
   font-family: var(--font-sans); font-size: .8rem; background: var(--paper); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 5px 8px; color: var(--ink-soft); cursor: pointer; max-width: 140px;
@@ -642,16 +660,6 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
   color: var(--ink-faint); font-size: .85rem; font-style: italic;
 }
 
-/* Inline PDF attachment blocks in the editor — a document card (icon +
-   filename) with the same move/remove toolbar used by photos (reuses
-   .rt-photo-toolbar/.rt-photo-tools/.rt-photo-move/.rt-photo-remove as-is). */
-.rt-pdf, .rt-pdf-existing { margin: 14px auto; max-width: 420px; }
-.rt-pdf-card {
-  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
-  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper);
-}
-.rt-pdf-name { flex: 1 1 auto; font-size: .88rem; color: var(--ink); overflow-wrap: anywhere; }
-
 /* Inline photos rendered within a published story's body */
 .inline-photo { margin: 1.6em 0; }
 .inline-photo .gallery-thumb { aspect-ratio: auto; width: 100%; max-width: 100%; cursor: zoom-in; }
@@ -670,31 +678,6 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .inline-photo--left { float: left; margin: 6px 28px 20px 0; }
 .inline-photo--right { float: right; margin: 6px 0 20px 28px; }
 .post-content:after { content: ""; display: table; clear: both; }
-
-/* File download card — used both for the inline card a published story
-   renders in place of a [[pdf:N]] token, and (via .rt-pdf-card above) the
-   equivalent block shown in the editor. The badge shows PDF/DOC/PAGES
-   depending on the attached file's type, so it's sized to fit "PAGES"
-   (min-width + horizontal padding) rather than a fixed square. */
-.pdf-attachment-icon {
-  flex: none; min-width: 38px; height: 38px; padding: 0 8px; border-radius: var(--radius); background: var(--terracotta);
-  color: var(--paper); display: flex; align-items: center; justify-content: center;
-  font-size: .62rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap;
-}
-.pdf-attachment {
-  display: flex; align-items: center; gap: 12px; margin: 1.6em 0; padding: 14px 18px;
-  max-width: 420px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--paper);
-  text-decoration: none; transition: box-shadow .15s ease, border-color .15s ease;
-}
-.pdf-attachment:hover { border-color: var(--terracotta); box-shadow: var(--shadow-sm); }
-.pdf-attachment-name { flex: 1 1 auto; font-size: .92rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
-.pdf-attachment-cta { flex: none; font-size: .78rem; font-weight: 600; color: var(--terracotta); }
-
-.post-pdfs-section { margin-top: 2em; }
-.post-pdfs-list { display: flex; flex-direction: column; gap: 12px; }
-
-.leftover-pdf-item { flex-direction: row; align-items: center; width: auto; max-width: 260px; padding: 6px 10px; }
-.leftover-pdf-item .pdf-attachment-icon { min-width: 30px; height: 30px; padding: 0 6px; font-size: .52rem; }
 
 /* ---------- "Preview my story" modal (submit / edit pages) ---------- */
 .preview-modal-overlay {

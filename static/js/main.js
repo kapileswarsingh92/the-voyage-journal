@@ -587,19 +587,13 @@
     var photoPicker = richWrapper.querySelector("[data-inline-photo-picker]");
     var imagesInput = richWrapper.querySelector("[data-inline-images-input]");
     var photoPlanInput = richWrapper.querySelector("[data-photo-plan-input]");
-    var pdfPicker = richWrapper.querySelector("[data-inline-pdf-picker]");
-    var pdfsInput = richWrapper.querySelector("[data-inline-pdfs-input]");
-    var pdfPlanInput = richWrapper.querySelector("[data-pdf-plan-input]");
     var toolbar = richWrapper.querySelector("[data-rich-toolbar]");
     var insertBtn = richWrapper.querySelector("[data-insert-photo]");
-    var insertPdfBtn = richWrapper.querySelector("[data-insert-pdf]");
     var form = richWrapper.closest("form");
 
     var pendingFiles = new Map(); // uid -> File (photos)
-    var pendingPdfFiles = new Map(); // uid -> File (PDFs)
     var savedRange = null;
     var maxGalleryImages = parseInt(richWrapper.getAttribute("data-max-gallery"), 10) || 0;
-    var maxStoryPdfs = parseInt(richWrapper.getAttribute("data-max-pdfs"), 10) || 0;
 
     try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) { /* best effort */ }
 
@@ -699,15 +693,13 @@
       if (downBtn) downBtn.disabled = !significantSibling(wrapper, "down");
     }
 
-    // Recomputes up/down disabled state for every photo AND pdf block
-    // currently in the story — needed whenever the set or order of
-    // top-level blocks changes, since a single wrapper's own refresh can't
-    // know about the neighbors it swapped with. refreshPhotoToolbarState
-    // is safe to call on a PDF wrapper too — its size/align lookups just
-    // find nothing and no-op, and the up/down logic is generic.
+    // Recomputes up/down disabled state for every photo block currently in
+    // the story — needed whenever the set or order of top-level blocks
+    // changes, since a single wrapper's own refresh can't know about the
+    // neighbors it swapped with.
     function refreshAllPhotoToolbars() {
       Array.prototype.forEach.call(
-        richContent.querySelectorAll(".rt-photo, .rt-photo-existing, .rt-pdf, .rt-pdf-existing"),
+        richContent.querySelectorAll(".rt-photo, .rt-photo-existing"),
         refreshPhotoToolbarState
       );
     }
@@ -826,103 +818,6 @@
       refreshPhotoToolbarState(wrapper);
     }
 
-    // Lighter toolbar for an inline PDF block — just move up/down + remove,
-    // no size/align (a document card doesn't have a "size"). Reuses the
-    // exact same .rt-photo-toolbar/.rt-photo-tools/.rt-photo-move/
-    // .rt-photo-remove classes as the photo toolbar so it picks up the same
-    // styling and so refreshPhotoToolbarState/refreshAllPhotoToolbars (which
-    // only look for those classes and a generic up/down pair) work on PDF
-    // wrappers without any changes.
-    function attachPdfToolbar(wrapper, onRemove) {
-      var toolbar = document.createElement("div");
-      toolbar.className = "rt-photo-toolbar";
-      toolbar.contentEditable = "false";
-
-      var tools = document.createElement("div");
-      tools.className = "rt-photo-tools";
-
-      var upBtn = document.createElement("button");
-      upBtn.type = "button";
-      upBtn.className = "rt-photo-move";
-      upBtn.setAttribute("data-move", "up");
-      upBtn.setAttribute("aria-label", "Move PDF earlier in the story");
-      upBtn.title = "Move up";
-      upBtn.innerHTML = "&uarr;";
-      upBtn.addEventListener("click", function () { movePhotoBlock(wrapper, "up"); });
-
-      var downBtn = document.createElement("button");
-      downBtn.type = "button";
-      downBtn.className = "rt-photo-move";
-      downBtn.setAttribute("data-move", "down");
-      downBtn.setAttribute("aria-label", "Move PDF later in the story");
-      downBtn.title = "Move down";
-      downBtn.innerHTML = "&darr;";
-      downBtn.addEventListener("click", function () { movePhotoBlock(wrapper, "down"); });
-
-      var removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "rt-photo-remove";
-      removeBtn.setAttribute("aria-label", "Remove PDF");
-      removeBtn.innerHTML = "&times;";
-      removeBtn.addEventListener("click", function () {
-        onRemove();
-        wrapper.remove();
-        refreshAllPhotoToolbars();
-        syncFallback();
-      });
-
-      tools.appendChild(upBtn);
-      tools.appendChild(downBtn);
-      tools.appendChild(removeBtn);
-      toolbar.appendChild(tools);
-      wrapper.appendChild(toolbar);
-      refreshPhotoToolbarState(wrapper);
-    }
-
-    // Mirrors file_badge_label() in app/utils.py — short badge text (PDF /
-    // DOC / PAGES) derived from a filename's extension, so an attachment's
-    // card shows what kind of file it actually is.
-    function fileBadgeLabel(name) {
-      var m = /\.([a-z0-9]+)$/i.exec(name || "");
-      var ext = m ? m[1].toLowerCase() : "";
-      if (ext === "pdf") return "PDF";
-      if (ext === "doc" || ext === "docx") return "DOC";
-      if (ext === "pages") return "PAGES";
-      return "FILE";
-    }
-
-    function buildPdfCard(name) {
-      var card = document.createElement("div");
-      card.className = "rt-pdf-card";
-      var icon = document.createElement("span");
-      icon.className = "pdf-attachment-icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = fileBadgeLabel(name);
-      var nameEl = document.createElement("span");
-      nameEl.className = "rt-pdf-name";
-      nameEl.textContent = name;
-      card.appendChild(icon);
-      card.appendChild(nameEl);
-      return card;
-    }
-
-    // Builds a managed PDF block (document card + move/remove toolbar,
-    // registered in pendingPdfFiles so it's included as a real upload on
-    // submit) — the PDF equivalent of buildPhotoWrapper.
-    function buildPdfWrapper(file) {
-      var uid = "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-      pendingPdfFiles.set(uid, file);
-
-      var wrapper = document.createElement("div");
-      wrapper.className = "rt-pdf";
-      wrapper.contentEditable = "false";
-      wrapper.setAttribute("data-uid", uid);
-      wrapper.appendChild(buildPdfCard(file.name));
-
-      attachPdfToolbar(wrapper, function () { pendingPdfFiles.delete(uid); });
-      return wrapper;
-    }
-
     function makeExistingPhotoBlock(filename, url, size, align) {
       var wrapper = document.createElement("div");
       wrapper.className = "rt-photo-existing";
@@ -940,29 +835,17 @@
       return wrapper;
     }
 
-    function makeExistingPdfBlock(filename, originalFilename) {
-      var wrapper = document.createElement("div");
-      wrapper.className = "rt-pdf-existing";
-      wrapper.contentEditable = "false";
-      wrapper.setAttribute("data-filename", filename);
-      wrapper.appendChild(buildPdfCard(originalFilename));
-
-      attachPdfToolbar(wrapper, function () {}); // nothing to unregister for an already-saved PDF
-      return wrapper;
-    }
-
     // Size and align suffixes are each independently optional (and the
     // photo-size and alignment keyword sets never overlap), so this parses
     // every token shape that's ever been saved: bare, size-only, align-only,
     // or both — matches the server's INLINE_PHOTO_RE in app/blog.py.
     var PHOTO_TOKEN_RE = /^\[\[photo:(\d+)(?:\|(small|medium|large|full))?(?:\|(left|right|center))?\]\]$/;
-    var PDF_TOKEN_RE = /^\[\[pdf:(\d+)\]\]$/;
 
-    function importContent(html, images, pdfs) {
+    function importContent(html, images) {
       richContent.innerHTML = html || "";
       var tokenParas = Array.prototype.filter.call(richContent.querySelectorAll("p"), function (p) {
         var text = (p.textContent || "").trim();
-        return PHOTO_TOKEN_RE.test(text) || PDF_TOKEN_RE.test(text);
+        return PHOTO_TOKEN_RE.test(text);
       });
       tokenParas.forEach(function (p) {
         var text = (p.textContent || "").trim();
@@ -981,26 +864,13 @@
             chip.textContent = "📷 Photo " + n + " — please re-attach this photo";
             p.replaceWith(chip);
           }
-          return;
-        }
-        var dm = text.match(PDF_TOKEN_RE);
-        var dn = parseInt(dm[1], 10);
-        var pdf = pdfs && pdfs[dn - 1];
-        if (pdf) {
-          p.replaceWith(makeExistingPdfBlock(pdf.filename, pdf.original_filename));
-        } else {
-          var pdfChip = document.createElement("div");
-          pdfChip.className = "rt-photo-chip";
-          pdfChip.contentEditable = "false";
-          pdfChip.textContent = "📄 File " + dn + " — please re-attach this file";
-          p.replaceWith(pdfChip);
         }
       });
       refreshAllPhotoToolbars();
     }
 
     if (fallback.value && fallback.value.trim()) {
-      importContent(fallback.value, window.__existingStoryPhotos, window.__existingStoryPdfs);
+      importContent(fallback.value, window.__existingStoryPhotos);
     }
 
     richWrapper.classList.add("js-rich-active");
@@ -1101,33 +971,6 @@
         node.replaceWith(token);
       });
 
-      // Same idea as the photo loop above, but PDFs get their own
-      // independent 1-indexed token sequence ([[pdf:N]]) — a story's
-      // photos and PDFs are two separate ordered lists server-side
-      // (post_images / post_pdfs), not one shared one.
-      var orderedPdfRefs = [];
-      var pdfIndex = 0;
-      var pdfNodes = Array.prototype.slice.call(clone.querySelectorAll(".rt-pdf, .rt-pdf-existing"));
-      pdfNodes.forEach(function (node) {
-        var token = document.createElement("p");
-        if (node.classList.contains("rt-pdf-existing")) {
-          pdfIndex += 1;
-          orderedPdfRefs.push({ type: "existing", filename: node.getAttribute("data-filename") });
-          token.textContent = "[[pdf:" + pdfIndex + "]]";
-          node.replaceWith(token);
-          return;
-        }
-        var uid = node.getAttribute("data-uid");
-        if (!pendingPdfFiles.has(uid)) {
-          node.remove();
-          return;
-        }
-        pdfIndex += 1;
-        orderedPdfRefs.push({ type: "new", uid: uid });
-        token.textContent = "[[pdf:" + pdfIndex + "]]";
-        node.replaceWith(token);
-      });
-
       // Drop now-empty top-level paragraphs/divs (e.g. the blank <p><br></p>
       // the editor keeps around for the caret to land in) so they don't
       // pad out the story or throw off the length check.
@@ -1141,7 +984,7 @@
         }
       });
 
-      return { html: clone.innerHTML.trim(), orderedRefs: orderedRefs, orderedPdfRefs: orderedPdfRefs };
+      return { html: clone.innerHTML.trim(), orderedRefs: orderedRefs };
     }
 
     function syncFallback() {
@@ -1513,7 +1356,7 @@
       syncFallback();
     });
 
-    // --- toolbar: bold / italic / bullet list ---
+    // --- toolbar: bold / italic / underline / bullet list ---
     toolbar.addEventListener("mousedown", function (e) {
       if (e.target.closest("[data-cmd]")) e.preventDefault(); // don't steal focus/selection
     });
@@ -1551,135 +1394,6 @@
         insertPhoto(file);
       }
     });
-
-    // --- insert file at cursor (Word/Pages/PDF) ---
-    // PDF/Pages/legacy-.doc are attached as-is, exactly like before. A real
-    // .docx gets smarter handling: its text/formatting/images are imported
-    // as actual editable story content (replacing whatever's currently in
-    // the editor) rather than becoming a download card — see
-    // handleDocxImport below. The picker's max-attached-files check only
-    // applies to the attach-as-is path, since a .docx import doesn't add a
-    // download card at all.
-    if (insertPdfBtn) {
-      insertPdfBtn.addEventListener("mousedown", saveSelection);
-      insertPdfBtn.addEventListener("click", function () {
-        pdfPicker.value = "";
-        pdfPicker.click();
-      });
-      pdfPicker.addEventListener("change", function () {
-        var file = pdfPicker.files && pdfPicker.files[0];
-        if (!file) return;
-        if (file.size > 20 * 1024 * 1024) {
-          window.alert('"' + file.name + '" is larger than 20MB — please choose a smaller file.');
-          return;
-        }
-        if (!/\.(pdf|docx?|pages)$/i.test(file.name)) {
-          window.alert('"' + file.name + '" isn\'t a supported file type — choose a PDF, Word, or Pages document.');
-          return;
-        }
-        if (/\.docx$/i.test(file.name)) {
-          handleDocxImport(file);
-          return;
-        }
-        var currentPdfCount = richContent.querySelectorAll(".rt-pdf, .rt-pdf-existing").length;
-        if (maxStoryPdfs && currentPdfCount >= maxStoryPdfs) {
-          window.alert("This story can have up to " + maxStoryPdfs + " files — remove one before adding another.");
-          return;
-        }
-        insertPdf(file);
-      });
-    }
-
-    // Word-doc import: uploads the .docx to /docx-import for server-side
-    // parsing (python-docx isn't something we could ever replicate in the
-    // browser), then rebuilds the editor's entire content from the
-    // response — real paragraphs/bold/italic/lists, and a real inserted
-    // photo block (reusing buildPhotoWrapper, so it gets the normal
-    // size/align/move/remove toolbar and flows through the normal
-    // upload/crop-free pipeline on submit) wherever the document had an
-    // embedded image. This is a full replace, not an at-cursor insert —
-    // confirmed with the user first if the editor isn't already empty,
-    // since there's no undo once the old content's gone.
-    function ensureTypeableTail() {
-      var last = richContent.lastElementChild;
-      var isAtomicBlock = last && last.classList &&
-        (last.classList.contains("rt-photo") || last.classList.contains("rt-pdf"));
-      if (!last || isAtomicBlock) {
-        var p = document.createElement("p");
-        p.appendChild(document.createElement("br"));
-        richContent.appendChild(p);
-      }
-    }
-
-    function importDocxHtml(html, images) {
-      return Promise.all(images.map(function (img) { return dataUriToFile(img.data_url); }))
-        .then(function (files) {
-          pendingFiles.clear();
-          pendingPdfFiles.clear();
-          richContent.innerHTML = "";
-
-          var temp = document.createElement("div");
-          temp.innerHTML = html;
-          var docximgRe = /^\[\[docximg:(\d+)\]\]$/;
-
-          Array.prototype.forEach.call(temp.childNodes, function (node) {
-            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "P") {
-              var m = docximgRe.exec((node.textContent || "").trim());
-              if (m) {
-                var file = files[parseInt(m[1], 10) - 1];
-                if (file) richContent.appendChild(buildPhotoWrapper(file));
-                return;
-              }
-            }
-            richContent.appendChild(node.cloneNode(true));
-          });
-
-          ensureTypeableTail();
-          refreshAllPhotoToolbars();
-          syncFallback();
-        });
-    }
-
-    function handleDocxImport(file) {
-      var hasExistingContent = richContent.textContent.trim().length > 0 ||
-        richContent.querySelector(".rt-photo, .rt-photo-existing, .rt-pdf, .rt-pdf-existing");
-      if (hasExistingContent) {
-        var proceed = window.confirm(
-          'Importing "' + file.name + '" will replace everything currently in your story ' +
-          "(text, photos, and attached files) with the document's own content. Continue?"
-        );
-        if (!proceed) return;
-      }
-
-      var csrfField = form.querySelector('[name="csrf_token"]');
-      var formData = new FormData();
-      formData.append("csrf_token", csrfField ? csrfField.value : "");
-      formData.append("docx_file", file);
-
-      var originalLabel = insertPdfBtn.innerHTML;
-      insertPdfBtn.disabled = true;
-      insertPdfBtn.textContent = "Importing…";
-
-      fetch("/docx-import", { method: "POST", body: formData })
-        .then(function (res) {
-          return res.json().then(function (data) { return { status: res.status, data: data }; });
-        })
-        .then(function (result) {
-          if (result.status !== 200 || !result.data.ok) {
-            window.alert(result.data.error || "Couldn't import that document.");
-            return;
-          }
-          return importDocxHtml(result.data.html, result.data.images || []);
-        })
-        .catch(function () {
-          window.alert("Couldn't reach the server to import that document — please try again.");
-        })
-        .then(function () {
-          insertPdfBtn.disabled = false;
-          insertPdfBtn.innerHTML = originalLabel;
-        });
-    }
-
 
     // Builds the same managed "photo block" (thumbnail + size/move/remove
     // toolbar, registered in pendingFiles so it's included as a real upload
@@ -1737,9 +1451,9 @@
     // Walk up from the cursor to whichever node is a direct child of the
     // editor (a <p>, <ul>, ...) so a newly-inserted block always lands as
     // its own top-level block — never nested inside a paragraph, which
-    // would otherwise corrupt serialization (a photo/PDF block has to be a
+    // would otherwise corrupt serialization (a photo block has to be a
     // sibling of paragraphs, not a child of one, for the token logic to
-    // see it). Shared by insertPhoto and insertPdf below.
+    // see it). Used by insertPhoto below.
     function insertBlockAtCursor(wrapper) {
       function topLevelNodeFor(node) {
         while (node && node.parentNode !== richContent) {
@@ -1779,12 +1493,6 @@
       syncFallback();
     }
 
-    function insertPdf(file) {
-      insertBlockAtCursor(buildPdfWrapper(file));
-      refreshAllPhotoToolbars();
-      syncFallback();
-    }
-
     // --- on submit: push the final serialized HTML + ordered files into the real form fields ---
     if (form) {
       form.addEventListener("submit", function () {
@@ -1806,24 +1514,6 @@
           if (photoPlanInput) photoPlanInput.value = planParts.join(",");
         } else if (photoPlanInput) {
           photoPlanInput.value = "";
-        }
-
-        if (result.orderedPdfRefs.length && typeof DataTransfer !== "undefined") {
-          var pdfDt = new DataTransfer();
-          var pdfPlanParts = [];
-          result.orderedPdfRefs.forEach(function (ref) {
-            if (ref.type === "existing") {
-              pdfPlanParts.push("existing:" + ref.filename);
-              return;
-            }
-            pdfPlanParts.push("new");
-            var pdfFile = pendingPdfFiles.get(ref.uid);
-            if (pdfFile) pdfDt.items.add(pdfFile);
-          });
-          pdfsInput.files = pdfDt.files;
-          if (pdfPlanInput) pdfPlanInput.value = pdfPlanParts.join(",");
-        } else if (pdfPlanInput) {
-          pdfPlanInput.value = "";
         }
       });
     }
@@ -1878,7 +1568,7 @@
         var tokenPattern =
           "\\[\\[photo:(\\d+)(?:\\|(small|medium|large|full))?(?:\\|(left|right|center))?\\]\\]";
         var re = new RegExp("<p>\\s*" + tokenPattern + "\\s*</p>|" + tokenPattern, "g");
-        var html = result.html.replace(
+        return result.html.replace(
           re,
           function (whole, n1, s1, a1, n2, s2, a2) {
             var n = parseInt(n1 || n2, 10);
@@ -1901,38 +1591,6 @@
               '"><img src="' + url + '" alt="Story photo ' + n + '" loading="lazy"></figure>';
           }
         );
-        var pdfTokenPattern = "\\[\\[pdf:(\\d+)\\]\\]";
-        var pdfRe = new RegExp("<p>\\s*" + pdfTokenPattern + "\\s*</p>|" + pdfTokenPattern, "g");
-        return html.replace(pdfRe, function (whole, n1, n2) {
-          var n = parseInt(n1 || n2, 10);
-          var ref = result.orderedPdfRefs[n - 1];
-          if (!ref) return "";
-          var url = "";
-          var name = "";
-          if (ref.type === "existing") {
-            var pdfMatches = (window.__existingStoryPdfs || []).filter(function (p) {
-              return p.filename === ref.filename;
-            });
-            if (pdfMatches.length) {
-              url = pdfMatches[0].url;
-              name = pdfMatches[0].original_filename;
-            }
-          } else {
-            var pdfFile = pendingPdfFiles.get(ref.uid);
-            if (pdfFile) {
-              url = URL.createObjectURL(pdfFile);
-              name = pdfFile.name;
-            }
-          }
-          if (!url) return "";
-          var escapedName = String(name).replace(/[&<>"']/g, function (c) {
-            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-          });
-          return '<a class="pdf-attachment" href="' + url + '" target="_blank" rel="noopener">' +
-            '<span class="pdf-attachment-icon" aria-hidden="true">' + fileBadgeLabel(name) + '</span>' +
-            '<span class="pdf-attachment-name">' + escapedName + '</span>' +
-            '<span class="pdf-attachment-cta">Download</span></a>';
-        });
       };
 
       previewBtn.addEventListener("click", function () {

@@ -1,4 +1,3 @@
-import base64
 import html as html_lib
 import re
 
@@ -17,17 +16,13 @@ from flask import (
 )
 
 from .db import get_db
-from .docx_import import DocxImportError, parse_docx
 from .utils import (
     MAX_GALLERY_IMAGES,
-    MAX_STORY_PDFS,
-    file_badge_label,
     login_required,
     looks_like_html,
     sanitize_story_html,
     save_cover_image,
     save_gallery_images,
-    save_pdfs,
     slugify,
     strip_story_html,
     unique_slug,
@@ -57,18 +52,6 @@ def referenced_photo_positions(raw: str) -> set:
     return {int(m.group(1)) - 1 for m in INLINE_PHOTO_RE.finditer(raw or "")}
 
 
-# PDFs are inserted the same way photos are — a [[pdf:N]] token in the
-# story body, N matching the 1-indexed order they were attached in — but
-# rendered as a download card rather than processed/resized, so there's no
-# size or align modifier to parse.
-INLINE_PDF_RE = re.compile(r"\[\[pdf:(\d+)\]\]")
-
-
-def referenced_pdf_positions(raw: str) -> set:
-    """Which post_pdfs positions (0-indexed) are placed inline via [[pdf:N]] tokens."""
-    return {int(m.group(1)) - 1 for m in INLINE_PDF_RE.finditer(raw or "")}
-
-
 def normalize_story_content(raw: str) -> str:
     """Turn whatever the submit/edit form posted for `content` into safe,
     storage-ready HTML — this is the ONE place story bodies are sanitized,
@@ -95,15 +78,13 @@ def normalize_story_content(raw: str) -> str:
     return md.markdown(escaped, extensions=["nl2br", "sane_lists"])
 
 
-def render_story_content(stored_html: str, images=None, pdfs=None) -> str:
-    """Swap [[photo:N]] and [[pdf:N]] tokens in an already-sanitized, stored
-    story body for real inline photos / PDF download cards (N is 1-indexed,
-    matching the order each was attached in). No escaping or markdown
-    parsing happens here — that all already happened once, at save time, in
-    `normalize_story_content`."""
+def render_story_content(stored_html: str, images=None) -> str:
+    """Swap [[photo:N]] tokens in an already-sanitized, stored story body for
+    real inline photos (N is 1-indexed, matching the order each was
+    attached in). No escaping or markdown parsing happens here — that all
+    already happened once, at save time, in `normalize_story_content`."""
     html_out = stored_html or ""
     images = images or []
-    pdfs = pdfs or []
 
     def _swap(match):
         n = int(match.group(1))
@@ -125,36 +106,24 @@ def render_story_content(stored_html: str, images=None, pdfs=None) -> str:
             "</figure>"
         )
 
-    def _swap_pdf(match):
-        n = int(match.group(1))
-        if n < 1 or n > len(pdfs):
-            return ""
-        pdf = pdfs[n - 1]
-        url = url_for("uploaded_file", filename=pdf["filename"])
-        name = html_lib.escape(pdf["original_filename"])
-        badge = file_badge_label(pdf["filename"])
-        return (
-            f'<a class="pdf-attachment" href="{url}" download="{name}" target="_blank" rel="noopener">'
-            f'<span class="pdf-attachment-icon" aria-hidden="true">{badge}</span>'
-            f'<span class="pdf-attachment-name">{name}</span>'
-            f'<span class="pdf-attachment-cta">Download</span>'
-            "</a>"
-        )
-
     # The token is normally alone in its own paragraph; swap the whole
-    # paragraph so the figure/card stays a clean block element (not nested
+    # paragraph so the figure stays a clean block element (not nested
     # inside a <p>) — that's what lets a left/right-floated photo have
     # surrounding paragraphs wrap around it as actual siblings, not
     # descendants.
     html_out = re.sub(
         r"<p>\s*" + INLINE_PHOTO_RE.pattern + r"\s*</p>", _swap, html_out
     )
-    html_out = re.sub(
-        r"<p>\s*" + INLINE_PDF_RE.pattern + r"\s*</p>", _swap_pdf, html_out
-    )
     # fallback for a token left inline within running text
     html_out = INLINE_PHOTO_RE.sub(_swap, html_out)
-    html_out = INLINE_PDF_RE.sub(_swap_pdf, html_out)
+
+    # The file-attachment feature ("Insert file" — PDF/Word/Pages cards) has
+    # been removed, but a story saved while it still existed may still have
+    # a [[pdf:N]] token sitting in its stored content. With nothing left to
+    # swap it for, drop it silently here rather than leak the raw token as
+    # visible text on the page.
+    html_out = re.sub(r"<p>\s*\[\[pdf:\d+\]\]\s*</p>", "", html_out)
+    html_out = re.sub(r"\[\[pdf:\d+\]\]", "", html_out)
     return html_out
 
 
@@ -296,17 +265,11 @@ def detail(slug):
         "SELECT * FROM post_images WHERE post_id = ? ORDER BY position ASC, id ASC",
         (post["id"],),
     ).fetchall()
-    pdfs = db.execute(
-        "SELECT * FROM post_pdfs WHERE post_id = ? ORDER BY position ASC, id ASC",
-        (post["id"],),
-    ).fetchall()
 
-    post["content_html"] = render_story_content(post["content"], gallery, pdfs)
+    post["content_html"] = render_story_content(post["content"], gallery)
 
     placed = referenced_photo_positions(post["content"])
     leftover_gallery = [img for img in gallery if img["position"] not in placed]
-    placed_pdfs = referenced_pdf_positions(post["content"])
-    leftover_pdfs = [pdf for pdf in pdfs if pdf["position"] not in placed_pdfs]
 
     # Count a view for everyone except the story's own author or an admin,
     # so the "My Stories" view count isn't inflated by the writer checking
@@ -354,7 +317,6 @@ def detail(slug):
         related=related,
         gallery=gallery,
         leftover_gallery=leftover_gallery,
-        leftover_pdfs=leftover_pdfs,
         share_url=share_url,
         preview=preview,
     )
@@ -439,46 +401,13 @@ def share(slug):
     return jsonify(ok=True, count=count)
 
 
-@bp.route("/docx-import", methods=["POST"])
-def docx_import():
-    """AJAX endpoint behind the "Insert file" toolbar button's smarter
-    .docx handling: parses an uploaded Word document into story-editor
-    HTML + extracted images and hands them back as JSON, without touching
-    the database — the client is responsible for turning the result into
-    real editor content and (only once the story is actually submitted)
-    real uploads. No login required, matching /submit's own anonymous
-    access; still CSRF-protected like every other POST here."""
-    if not validate_csrf(request.form):
-        return jsonify(error="Your session expired — please refresh the page and try again."), 400
-    file_storage = request.files.get("docx_file")
-    if not file_storage or not file_storage.filename:
-        return jsonify(error="No file received."), 400
-
-    try:
-        html_out, images = parse_docx(file_storage, MAX_GALLERY_IMAGES)
-    except DocxImportError as e:
-        return jsonify(error=str(e)), 400
-    except Exception:
-        current_app.logger.exception("Unexpected error importing a Word document")
-        return jsonify(error="Something went wrong reading that document."), 400
-
-    images_out = [
-        {
-            "content_type": img["content_type"],
-            "data_url": "data:" + img["content_type"] + ";base64," + base64.b64encode(img["data"]).decode("ascii"),
-        }
-        for img in images
-    ]
-    return jsonify(ok=True, html=html_out, images=images_out)
-
-
 @bp.route("/submit", methods=("GET", "POST"))
 def submit():
     if request.method == "POST":
         if not validate_csrf(request.form):
             flash("Your session expired — please refresh and try again.", "error")
             return render_template(
-                "submit.html", form=request.form, max_gallery=MAX_GALLERY_IMAGES, max_pdfs=MAX_STORY_PDFS
+                "submit.html", form=request.form, max_gallery=MAX_GALLERY_IMAGES
             )
 
         title = request.form.get("title", "").strip()
@@ -506,19 +435,17 @@ def submit():
 
         cover_filename = None
         inline_filenames = []
-        pdf_uploads = []
         if error is None:
             try:
                 cover_filename = save_cover_image(request.files.get("cover_image"))
                 inline_filenames = save_gallery_images(request.files.getlist("inline_images"))
-                pdf_uploads = save_pdfs(request.files.getlist("inline_pdfs"))
             except ValueError as e:
                 error = str(e)
 
         if error:
             flash(error, "error")
             return render_template(
-                "submit.html", form=form_data, max_gallery=MAX_GALLERY_IMAGES, max_pdfs=MAX_STORY_PDFS
+                "submit.html", form=form_data, max_gallery=MAX_GALLERY_IMAGES
             )
 
         db = get_db()
@@ -548,15 +475,10 @@ def submit():
                 "INSERT INTO post_images (post_id, filename, position) VALUES (?, ?, ?)",
                 (post_id, fname, i),
             )
-        for i, pdf in enumerate(pdf_uploads):
-            db.execute(
-                "INSERT INTO post_pdfs (post_id, filename, original_filename, position) VALUES (?, ?, ?, ?)",
-                (post_id, pdf["filename"], pdf["original_filename"], i),
-            )
         db.commit()
         return render_template("submit_success.html", title=title)
 
-    return render_template("submit.html", form={}, max_gallery=MAX_GALLERY_IMAGES, max_pdfs=MAX_STORY_PDFS)
+    return render_template("submit.html", form={}, max_gallery=MAX_GALLERY_IMAGES)
 
 
 @bp.route("/account/my-stories")
@@ -593,25 +515,9 @@ def edit(slug):
         for img in gallery
     ]
 
-    pdf_gallery = db.execute(
-        "SELECT * FROM post_pdfs WHERE post_id = ? ORDER BY position ASC, id ASC",
-        (post["id"],),
-    ).fetchall()
-    placed_pdfs = referenced_pdf_positions(post["content"])
-    leftover_pdfs = [pdf for pdf in pdf_gallery if pdf["position"] not in placed_pdfs]
-    existing_pdfs = [
-        {
-            "filename": pdf["filename"],
-            "original_filename": pdf["original_filename"],
-            "url": url_for("uploaded_file", filename=pdf["filename"]),
-        }
-        for pdf in pdf_gallery
-    ]
-
     template_extra = dict(
-        max_gallery=MAX_GALLERY_IMAGES, max_pdfs=MAX_STORY_PDFS,
+        max_gallery=MAX_GALLERY_IMAGES,
         gallery=gallery, leftover=leftover, existing_photos=existing_photos,
-        pdf_gallery=pdf_gallery, leftover_pdfs=leftover_pdfs, existing_pdfs=existing_pdfs,
     )
 
     if request.method == "POST":
@@ -634,8 +540,6 @@ def edit(slug):
         form_data["content"] = content
         photo_plan_raw = request.form.get("photo_plan", "").strip()
         remove_leftover_ids = set(request.form.getlist("remove_leftover_ids"))
-        pdf_plan_raw = request.form.get("pdf_plan", "").strip()
-        remove_leftover_pdf_ids = set(request.form.getlist("remove_leftover_pdf_ids"))
 
         error = None
         if not title or len(title) < 4:
@@ -649,14 +553,12 @@ def edit(slug):
 
         new_cover_filename = post["cover_image"]
         new_uploaded_inline = []
-        new_uploaded_pdfs = []
         if error is None:
             try:
                 replacement_cover = save_cover_image(request.files.get("cover_image"))
                 if replacement_cover:
                     new_cover_filename = replacement_cover
                 new_uploaded_inline = save_gallery_images(request.files.getlist("inline_images"))
-                new_uploaded_pdfs = save_pdfs(request.files.getlist("inline_pdfs"))
             except ValueError as e:
                 error = str(e)
 
@@ -687,33 +589,6 @@ def edit(slug):
                 if len(final_images) > MAX_GALLERY_IMAGES:
                     error = f"A story can have up to {MAX_GALLERY_IMAGES} photos in total."
 
-        final_pdfs = []
-        if error is None:
-            existing_pdf_by_filename = {pdf["filename"]: pdf["original_filename"] for pdf in pdf_gallery}
-            pdf_plan = [p.strip() for p in pdf_plan_raw.split(",") if p.strip()]
-            new_pdf_iter = iter(new_uploaded_pdfs)
-            for entry in pdf_plan:
-                if entry == "new":
-                    try:
-                        final_pdfs.append(next(new_pdf_iter))
-                    except StopIteration:
-                        error = "Something went wrong matching your uploaded files — please try inserting them again."
-                        break
-                elif entry.startswith("existing:"):
-                    fname = entry[len("existing:"):]
-                    if fname not in existing_pdf_by_filename:
-                        error = "One of the referenced files is no longer available — please re-insert it."
-                        break
-                    final_pdfs.append({"filename": fname, "original_filename": existing_pdf_by_filename[fname]})
-
-            if error is None:
-                for pdf in leftover_pdfs:
-                    if str(pdf["id"]) not in remove_leftover_pdf_ids:
-                        final_pdfs.append({"filename": pdf["filename"], "original_filename": pdf["original_filename"]})
-
-                if len(final_pdfs) > MAX_STORY_PDFS:
-                    error = f"A story can have up to {MAX_STORY_PDFS} files in total."
-
         if error:
             flash(error, "error")
             return render_template(
@@ -735,12 +610,6 @@ def edit(slug):
             db.execute(
                 "INSERT INTO post_images (post_id, filename, position) VALUES (?, ?, ?)",
                 (post["id"], fname, i),
-            )
-        db.execute("DELETE FROM post_pdfs WHERE post_id = ?", (post["id"],))
-        for i, pdf in enumerate(final_pdfs):
-            db.execute(
-                "INSERT INTO post_pdfs (post_id, filename, original_filename, position) VALUES (?, ?, ?, ?)",
-                (post["id"], pdf["filename"], pdf["original_filename"], i),
             )
         db.commit()
 
