@@ -20,20 +20,19 @@
       <input id="title" name="title" type="text" maxlength="140" required value="{{ form.get('title', '') }}" placeholder="Five days on the Amalfi Coast">
     </div>
 
-    <div class="form-row two-col">
-      <div>
-        <label for="category">Category</label>
-        <select id="category" name="category" required>
-          <option value="" disabled {{ 'selected' if not form.get('category') }}>Choose one…</option>
-          {% for cat in categories %}
-          <option value="{{ cat }}" {{ 'selected' if form.get('category') == cat }}>{{ cat }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label for="location">Location</label>
-        <input id="location" name="location" type="text" maxlength="100" value="{{ form.get('location', '') }}" placeholder="Positano, Italy">
-      </div>
+    <div class="form-row">
+      <label for="category">Category</label>
+      <select id="category" name="category" required>
+        <option value="" disabled {{ 'selected' if not form.get('category') }}>Choose one…</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {{ 'selected' if form.get('category') == cat }}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label for="location">Location</label>
+      <input id="location" name="location" type="text" maxlength="100" value="{{ form.get('location', '') }}" placeholder="Positano, Italy">
     </div>
 
     <div class="form-row two-col">
