@@ -372,9 +372,9 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 /* When there's no sidebar content (no related stories to show), collapse to
    a single, centered column instead of leaving the 300px sidebar track (or
    a big empty margin) next to the article. */
-.post-layout--solo { grid-template-columns: minmax(0, 760px); justify-content: center; }
+.post-layout--solo { grid-template-columns: minmax(0, 960px); justify-content: center; }
 .post-content {
-  font-family: 'Times New Roman', Times, serif; font-size: 1.08rem; line-height: 1.78; color: var(--ink); max-width: 68ch;
+  font-family: 'Times New Roman', Times, serif; font-size: 1.08rem; line-height: 1.78; color: var(--ink); max-width: 900px;
 }
 .post-content p { color: var(--ink); margin-bottom: 1.2em; }
 .post-content h1, .post-content h2, .post-content h3 { margin-top: 1.3em; }
@@ -469,6 +469,11 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .comment-meta strong { color: var(--ink); }
 .comment-body p:last-child { margin-bottom: 0; color: var(--ink-soft); }
 .comment-empty { color: var(--ink-faint); font-style: italic; }
+
+/* Shown only to the story's own submitter, at the very bottom of the
+   article — lets them jump straight to editing without a permanent
+   sidebar card taking up space for everyone else. */
+.post-owner-actions { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line-soft); }
 
 .post-sidebar { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 96px; }
 .sidebar-card { background: var(--cream-2); border-radius: var(--radius-lg); padding: 22px; }
