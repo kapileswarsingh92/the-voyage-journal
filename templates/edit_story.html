@@ -97,9 +97,9 @@
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             Insert photo
           </button>
-          <button type="button" class="rich-toolbar-photo rich-toolbar-pdf" data-insert-pdf title="Insert PDF at cursor">
+          <button type="button" class="rich-toolbar-photo rich-toolbar-pdf" data-insert-pdf title="Attach a PDF or Pages file, or import a Word document as your story text">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-            Insert PDF
+            Insert file
           </button>
         </div>
         <div class="rich-content" contenteditable="true" data-rich-content
@@ -111,11 +111,11 @@
       <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" data-inline-photo-picker hidden>
       <input type="file" name="inline_images" multiple hidden data-inline-images-input>
       <input type="hidden" name="photo_plan" data-photo-plan-input value="">
-      <input type="file" accept=".pdf" data-inline-pdf-picker hidden>
+      <input type="file" accept=".pdf,.doc,.docx,.pages" data-inline-pdf-picker hidden>
       <input type="file" name="inline_pdfs" multiple hidden data-inline-pdfs-input>
       <input type="hidden" name="pdf_plan" data-pdf-plan-input value="">
 
-      <p class="field-hint">You can paste directly from Word, Pages, or Google Docs — bold/italic, fonts and sizes, and tables all carry over, and any images in the pasted text are attached automatically. Up to {{ max_gallery }} photos per story, 50MB each. Photos already in your story appear right where they were placed — remove one with its × or insert new ones with the toolbar (each gets a crop &amp; zoom step first, including a fully freeform crop). PDFs already attached appear inline too, with an "Insert PDF" button in the toolbar for new ones — up to {{ max_pdfs }} per story, 20MB each. Pick a font and size for any selected text, or for the whole story if nothing's selected.</p>
+      <p class="field-hint">You can paste directly from Word, Pages, or Google Docs — bold/italic, fonts and sizes, and tables all carry over, and any images in the pasted text are attached automatically. Up to {{ max_gallery }} photos per story, 50MB each. Photos already in your story appear right where they were placed — remove one with its × or insert new ones with the toolbar (each gets a crop &amp; zoom step first, including a fully freeform crop). Files already attached (Pages or PDF) appear inline too, with an "Insert file" button in the toolbar for new ones — up to {{ max_pdfs }} per story, 20MB each. Picking a Word (.docx) file there instead imports its text, formatting, and images straight into the story, replacing whatever's currently written (you'll be asked to confirm first). Pick a font and size for any selected text, or for the whole story if nothing's selected.</p>
     </div>
 
     {% if leftover %}
@@ -135,12 +135,12 @@
 
     {% if leftover_pdfs %}
     <div class="form-row">
-      <label>Other PDFs attached to this story</label>
+      <label>Other files attached to this story</label>
       <p class="field-hint">These aren't placed inline in the text — they show as downloads at the bottom of the story. Check "Remove" on any you'd like to take out.</p>
       <div class="leftover-photo-manage">
         {% for pdf in leftover_pdfs %}
         <label class="leftover-photo-item leftover-pdf-item">
-          <span class="pdf-attachment-icon" aria-hidden="true">PDF</span>
+          <span class="pdf-attachment-icon" aria-hidden="true">{{ pdf.filename | file_badge_label }}</span>
           <span>{{ pdf.original_filename }}</span>
           <span><input type="checkbox" name="remove_leftover_pdf_ids" value="{{ pdf.id }}"> Remove</span>
         </label>

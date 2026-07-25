@@ -1,3 +1,4 @@
+import base64
 import html as html_lib
 import re
 
@@ -16,9 +17,11 @@ from flask import (
 )
 
 from .db import get_db
+from .docx_import import DocxImportError, parse_docx
 from .utils import (
     MAX_GALLERY_IMAGES,
     MAX_STORY_PDFS,
+    file_badge_label,
     login_required,
     looks_like_html,
     sanitize_story_html,
@@ -129,9 +132,10 @@ def render_story_content(stored_html: str, images=None, pdfs=None) -> str:
         pdf = pdfs[n - 1]
         url = url_for("uploaded_file", filename=pdf["filename"])
         name = html_lib.escape(pdf["original_filename"])
+        badge = file_badge_label(pdf["filename"])
         return (
             f'<a class="pdf-attachment" href="{url}" download="{name}" target="_blank" rel="noopener">'
-            f'<span class="pdf-attachment-icon" aria-hidden="true">PDF</span>'
+            f'<span class="pdf-attachment-icon" aria-hidden="true">{badge}</span>'
             f'<span class="pdf-attachment-name">{name}</span>'
             f'<span class="pdf-attachment-cta">Download</span>'
             "</a>"
@@ -435,6 +439,39 @@ def share(slug):
     return jsonify(ok=True, count=count)
 
 
+@bp.route("/docx-import", methods=["POST"])
+def docx_import():
+    """AJAX endpoint behind the "Insert file" toolbar button's smarter
+    .docx handling: parses an uploaded Word document into story-editor
+    HTML + extracted images and hands them back as JSON, without touching
+    the database — the client is responsible for turning the result into
+    real editor content and (only once the story is actually submitted)
+    real uploads. No login required, matching /submit's own anonymous
+    access; still CSRF-protected like every other POST here."""
+    if not validate_csrf(request.form):
+        return jsonify(error="Your session expired — please refresh the page and try again."), 400
+    file_storage = request.files.get("docx_file")
+    if not file_storage or not file_storage.filename:
+        return jsonify(error="No file received."), 400
+
+    try:
+        html_out, images = parse_docx(file_storage, MAX_GALLERY_IMAGES)
+    except DocxImportError as e:
+        return jsonify(error=str(e)), 400
+    except Exception:
+        current_app.logger.exception("Unexpected error importing a Word document")
+        return jsonify(error="Something went wrong reading that document."), 400
+
+    images_out = [
+        {
+            "content_type": img["content_type"],
+            "data_url": "data:" + img["content_type"] + ";base64," + base64.b64encode(img["data"]).decode("ascii"),
+        }
+        for img in images
+    ]
+    return jsonify(ok=True, html=html_out, images=images_out)
+
+
 @bp.route("/submit", methods=("GET", "POST"))
 def submit():
     if request.method == "POST":
@@ -660,12 +697,12 @@ def edit(slug):
                     try:
                         final_pdfs.append(next(new_pdf_iter))
                     except StopIteration:
-                        error = "Something went wrong matching your uploaded PDFs — please try inserting them again."
+                        error = "Something went wrong matching your uploaded files — please try inserting them again."
                         break
                 elif entry.startswith("existing:"):
                     fname = entry[len("existing:"):]
                     if fname not in existing_pdf_by_filename:
-                        error = "One of the referenced PDFs is no longer available — please re-insert it."
+                        error = "One of the referenced files is no longer available — please re-insert it."
                         break
                     final_pdfs.append({"filename": fname, "original_filename": existing_pdf_by_filename[fname]})
 
@@ -675,7 +712,7 @@ def edit(slug):
                         final_pdfs.append({"filename": pdf["filename"], "original_filename": pdf["original_filename"]})
 
                 if len(final_pdfs) > MAX_STORY_PDFS:
-                    error = f"A story can have up to {MAX_STORY_PDFS} PDFs in total."
+                    error = f"A story can have up to {MAX_STORY_PDFS} files in total."
 
         if error:
             flash(error, "error")

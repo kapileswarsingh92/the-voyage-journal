@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import functools
 import html as html_lib
@@ -188,13 +190,41 @@ def save_gallery_images(file_storages) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# PDF attachments — inserted inline in a story (like a photo) but kept as
+# File attachments — inserted inline in a story (like a photo) but kept as
 # the original file and shown as a download card rather than processed.
+# Started out PDF-only (hence names like save_pdf/[[pdf:N]]/post_pdfs
+# throughout the codebase), then broadened to also accept Word and Pages
+# documents. Renaming the DB table/token format wasn't worth the churn once
+# they were already load-bearing elsewhere, so "pdf" in an identifier now
+# means "attached story file" in general — read it that way below.
 # ---------------------------------------------------------------------------
 
-ALLOWED_PDF_EXTENSIONS = {"pdf"}
-MAX_PDF_BYTES = 20 * 1024 * 1024  # 20MB per PDF
+ALLOWED_PDF_EXTENSIONS = {"pdf", "doc", "docx", "pages"}
+MAX_PDF_BYTES = 20 * 1024 * 1024  # 20MB per file
 MAX_STORY_PDFS = 5
+
+# Per-extension "does this look like a real file of that type" check, since
+# a renamed .exe or similar shouldn't sail through just because its name
+# ends in .docx. PDF has a plain text signature; docx/pages are zip
+# archives under the hood; legacy .doc is an OLE compound-file document.
+_FILE_MAGIC_CHECKS = {
+    "pdf": lambda header: header.startswith(b"%PDF-"),
+    "docx": lambda header: header.startswith(b"PK"),
+    "pages": lambda header: header.startswith(b"PK"),
+    "doc": lambda header: header.startswith(b"\xd0\xcf\x11\xe0"),
+}
+
+# Shown in the small badge on each attachment card — collapses doc/docx to
+# one label since readers don't care which Word format it is.
+FILE_BADGE_LABELS = {"pdf": "PDF", "doc": "DOC", "docx": "DOC", "pages": "PAGES"}
+
+
+def file_badge_label(filename: str) -> str:
+    """The short badge text (PDF / DOC / PAGES) for an attached file, based
+    on its stored extension. Used both when rendering a published story and
+    when re-deriving a badge for an already-saved attachment."""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    return FILE_BADGE_LABELS.get(ext, "FILE")
 
 
 def allowed_pdf(filename: str) -> bool:
@@ -202,21 +232,23 @@ def allowed_pdf(filename: str) -> bool:
 
 
 def save_pdf(file_storage) -> dict | None:
-    """Validate and save an uploaded PDF as-is (no processing, unlike
-    photos). Returns {"filename": <random stored name>, "original_filename":
-    <name to show/download as>}, or None."""
+    """Validate and save an uploaded PDF/Word/Pages file as-is (no
+    processing, unlike photos). Returns {"filename": <random stored name,
+    with the original extension preserved>, "original_filename": <name to
+    show/download as>}, or None."""
     if not file_storage or not file_storage.filename:
         return None
     if not allowed_pdf(file_storage.filename):
-        raise ValueError(f'"{file_storage.filename}" isn\'t a PDF.')
+        raise ValueError(f'"{file_storage.filename}" isn\'t a supported file type (PDF, Word, or Pages).')
     if _file_size(file_storage) > MAX_PDF_BYTES:
-        raise ValueError(f'"{file_storage.filename}" is larger than the 20MB limit per PDF.')
-    header = file_storage.stream.read(5)
+        raise ValueError(f'"{file_storage.filename}" is larger than the 20MB limit per file.')
+    ext = file_storage.filename.rsplit(".", 1)[1].lower()
+    header = file_storage.stream.read(8)
     file_storage.stream.seek(0)
-    if header != b"%PDF-":
-        raise ValueError(f'"{file_storage.filename}" doesn\'t look like a valid PDF.')
+    if not _FILE_MAGIC_CHECKS[ext](header):
+        raise ValueError(f'"{file_storage.filename}" doesn\'t look like a valid {ext.upper()} file.')
 
-    fname = f"{secrets.token_hex(12)}.pdf"
+    fname = f"{secrets.token_hex(12)}.{ext}"
     upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
     upload_dir.mkdir(parents=True, exist_ok=True)
     file_storage.save(upload_dir / fname)
@@ -225,11 +257,11 @@ def save_pdf(file_storage) -> dict | None:
 
 
 def save_pdfs(file_storages) -> list[dict]:
-    """Save up to MAX_STORY_PDFS PDFs. Returns a list of the same dicts
+    """Save up to MAX_STORY_PDFS files. Returns a list of the same dicts
     save_pdf() returns, in the order given."""
     files = [f for f in (file_storages or []) if f and f.filename]
     if len(files) > MAX_STORY_PDFS:
-        raise ValueError(f"You can attach up to {MAX_STORY_PDFS} PDFs per story.")
+        raise ValueError(f"You can attach up to {MAX_STORY_PDFS} files per story.")
     out = []
     for f in files:
         saved = save_pdf(f)

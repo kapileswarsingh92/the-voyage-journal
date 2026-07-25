@@ -76,7 +76,7 @@
           {% for pdf in leftover_pdfs %}
           <a class="pdf-attachment" href="{{ url_for('uploaded_file', filename=pdf.filename) }}"
              download="{{ pdf.original_filename }}" target="_blank" rel="noopener">
-            <span class="pdf-attachment-icon" aria-hidden="true">PDF</span>
+            <span class="pdf-attachment-icon" aria-hidden="true">{{ pdf.filename | file_badge_label }}</span>
             <span class="pdf-attachment-name">{{ pdf.original_filename }}</span>
             <span class="pdf-attachment-cta">Download</span>
           </a>

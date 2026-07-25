@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, g, send_from_directory
 
 from . import db as db_module
-from .utils import csrf_token, load_logged_in_user
+from .utils import csrf_token, file_badge_label, load_logged_in_user
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -66,6 +66,11 @@ def create_app(test_config=None):
     # ensure_post_pdfs_table's docstring.
     with app.app_context():
         db_module.ensure_post_pdfs_table()
+
+    # So templates can show the right badge (PDF/DOC/PAGES) for a leftover
+    # attachment without re-deriving the extension in Jinja: {{ pdf.filename
+    # | file_badge_label }}.
+    app.jinja_env.filters["file_badge_label"] = file_badge_label
 
     from . import auth, blog, admin
 

@@ -31,7 +31,7 @@
         </select>
       </div>
       <div>
-        <label for="location">Location <span class="optional">(optional)</span></label>
+        <label for="location">Location</label>
         <input id="location" name="location" type="text" maxlength="100" value="{{ form.get('location', '') }}" placeholder="Positano, Italy">
       </div>
     </div>
@@ -48,9 +48,8 @@
     </div>
 
     <div class="form-row">
-      <label for="cover_image">Cover image <span class="optional">(optional, JPG/PNG/WEBP/GIF, up to 50MB)</span></label>
+      <label for="cover_image">Cover image</label>
       <input id="cover_image" name="cover_image" type="file" accept=".jpg,.jpeg,.png,.webp,.gif">
-      <p class="field-hint">Shown as the story's header, and as its thumbnail on the homepage and story listings. You'll get a quick crop &amp; zoom step to frame it before it's attached (needs JavaScript — with scripts off, your photo is used as-is).</p>
     </div>
 
     <div class="form-row">
@@ -87,9 +86,9 @@
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             Insert photo
           </button>
-          <button type="button" class="rich-toolbar-photo rich-toolbar-pdf" data-insert-pdf title="Insert PDF at cursor">
+          <button type="button" class="rich-toolbar-photo rich-toolbar-pdf" data-insert-pdf title="Attach a PDF or Pages file, or import a Word document as your story text">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-            Insert PDF
+            Insert file
           </button>
         </div>
         <div class="rich-content" contenteditable="true" data-rich-content
@@ -101,11 +100,10 @@
 
       <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" data-inline-photo-picker hidden>
       <input type="file" name="inline_images" multiple hidden data-inline-images-input>
-      <input type="file" accept=".pdf" data-inline-pdf-picker hidden>
+      <input type="file" accept=".pdf,.doc,.docx,.pages" data-inline-pdf-picker hidden>
       <input type="file" name="inline_pdfs" multiple hidden data-inline-pdfs-input>
       <input type="hidden" name="pdf_plan" data-pdf-plan-input value="">
 
-      <p class="field-hint">You can paste directly from Word, Pages, or Google Docs — bold/italic, fonts and sizes, and tables all carry over. Any images in the pasted text are attached automatically, same as clicking “Insert photo.” Up to {{ max_gallery }} photos per story, 50MB each. Photos you insert appear right where you place them, with a crop &amp; zoom step first (including a fully freeform crop) so you can frame each one exactly how you like; pick a font and size for any selected text, or for the whole story if nothing's selected. You can also click “Insert PDF” to attach a document (itinerary, packing list, menu, and so on) right where your cursor is — up to {{ max_pdfs }} PDFs per story, 20MB each; it shows on the published story as a download card. Formatting and photo/PDF insertion need JavaScript — with scripts off you'll get a plain text box (still supports **bold**, *italic*, "- " lists).</p>
     </div>
 
     <div class="form-row submit-row">

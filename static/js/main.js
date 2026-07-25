@@ -879,13 +879,25 @@
       refreshPhotoToolbarState(wrapper);
     }
 
+    // Mirrors file_badge_label() in app/utils.py — short badge text (PDF /
+    // DOC / PAGES) derived from a filename's extension, so an attachment's
+    // card shows what kind of file it actually is.
+    function fileBadgeLabel(name) {
+      var m = /\.([a-z0-9]+)$/i.exec(name || "");
+      var ext = m ? m[1].toLowerCase() : "";
+      if (ext === "pdf") return "PDF";
+      if (ext === "doc" || ext === "docx") return "DOC";
+      if (ext === "pages") return "PAGES";
+      return "FILE";
+    }
+
     function buildPdfCard(name) {
       var card = document.createElement("div");
       card.className = "rt-pdf-card";
       var icon = document.createElement("span");
       icon.className = "pdf-attachment-icon";
       icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "PDF";
+      icon.textContent = fileBadgeLabel(name);
       var nameEl = document.createElement("span");
       nameEl.className = "rt-pdf-name";
       nameEl.textContent = name;
@@ -980,7 +992,7 @@
           var pdfChip = document.createElement("div");
           pdfChip.className = "rt-photo-chip";
           pdfChip.contentEditable = "false";
-          pdfChip.textContent = "📄 PDF " + dn + " — please re-attach this file";
+          pdfChip.textContent = "📄 File " + dn + " — please re-attach this file";
           p.replaceWith(pdfChip);
         }
       });
@@ -1540,15 +1552,17 @@
       }
     });
 
-    // --- insert PDF at cursor (no crop step — the file is attached as-is) ---
+    // --- insert file at cursor (Word/Pages/PDF) ---
+    // PDF/Pages/legacy-.doc are attached as-is, exactly like before. A real
+    // .docx gets smarter handling: its text/formatting/images are imported
+    // as actual editable story content (replacing whatever's currently in
+    // the editor) rather than becoming a download card — see
+    // handleDocxImport below. The picker's max-attached-files check only
+    // applies to the attach-as-is path, since a .docx import doesn't add a
+    // download card at all.
     if (insertPdfBtn) {
       insertPdfBtn.addEventListener("mousedown", saveSelection);
       insertPdfBtn.addEventListener("click", function () {
-        var currentPdfCount = richContent.querySelectorAll(".rt-pdf, .rt-pdf-existing").length;
-        if (maxStoryPdfs && currentPdfCount >= maxStoryPdfs) {
-          window.alert("This story can have up to " + maxStoryPdfs + " PDFs — remove one before adding another.");
-          return;
-        }
         pdfPicker.value = "";
         pdfPicker.click();
       });
@@ -1556,15 +1570,114 @@
         var file = pdfPicker.files && pdfPicker.files[0];
         if (!file) return;
         if (file.size > 20 * 1024 * 1024) {
-          window.alert('"' + file.name + '" is larger than 20MB — please choose a smaller PDF.');
+          window.alert('"' + file.name + '" is larger than 20MB — please choose a smaller file.');
           return;
         }
-        if (file.type && file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
-          window.alert('"' + file.name + '" doesn\'t look like a PDF.');
+        if (!/\.(pdf|docx?|pages)$/i.test(file.name)) {
+          window.alert('"' + file.name + '" isn\'t a supported file type — choose a PDF, Word, or Pages document.');
+          return;
+        }
+        if (/\.docx$/i.test(file.name)) {
+          handleDocxImport(file);
+          return;
+        }
+        var currentPdfCount = richContent.querySelectorAll(".rt-pdf, .rt-pdf-existing").length;
+        if (maxStoryPdfs && currentPdfCount >= maxStoryPdfs) {
+          window.alert("This story can have up to " + maxStoryPdfs + " files — remove one before adding another.");
           return;
         }
         insertPdf(file);
       });
+    }
+
+    // Word-doc import: uploads the .docx to /docx-import for server-side
+    // parsing (python-docx isn't something we could ever replicate in the
+    // browser), then rebuilds the editor's entire content from the
+    // response — real paragraphs/bold/italic/lists, and a real inserted
+    // photo block (reusing buildPhotoWrapper, so it gets the normal
+    // size/align/move/remove toolbar and flows through the normal
+    // upload/crop-free pipeline on submit) wherever the document had an
+    // embedded image. This is a full replace, not an at-cursor insert —
+    // confirmed with the user first if the editor isn't already empty,
+    // since there's no undo once the old content's gone.
+    function ensureTypeableTail() {
+      var last = richContent.lastElementChild;
+      var isAtomicBlock = last && last.classList &&
+        (last.classList.contains("rt-photo") || last.classList.contains("rt-pdf"));
+      if (!last || isAtomicBlock) {
+        var p = document.createElement("p");
+        p.appendChild(document.createElement("br"));
+        richContent.appendChild(p);
+      }
+    }
+
+    function importDocxHtml(html, images) {
+      return Promise.all(images.map(function (img) { return dataUriToFile(img.data_url); }))
+        .then(function (files) {
+          pendingFiles.clear();
+          pendingPdfFiles.clear();
+          richContent.innerHTML = "";
+
+          var temp = document.createElement("div");
+          temp.innerHTML = html;
+          var docximgRe = /^\[\[docximg:(\d+)\]\]$/;
+
+          Array.prototype.forEach.call(temp.childNodes, function (node) {
+            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "P") {
+              var m = docximgRe.exec((node.textContent || "").trim());
+              if (m) {
+                var file = files[parseInt(m[1], 10) - 1];
+                if (file) richContent.appendChild(buildPhotoWrapper(file));
+                return;
+              }
+            }
+            richContent.appendChild(node.cloneNode(true));
+          });
+
+          ensureTypeableTail();
+          refreshAllPhotoToolbars();
+          syncFallback();
+        });
+    }
+
+    function handleDocxImport(file) {
+      var hasExistingContent = richContent.textContent.trim().length > 0 ||
+        richContent.querySelector(".rt-photo, .rt-photo-existing, .rt-pdf, .rt-pdf-existing");
+      if (hasExistingContent) {
+        var proceed = window.confirm(
+          'Importing "' + file.name + '" will replace everything currently in your story ' +
+          "(text, photos, and attached files) with the document's own content. Continue?"
+        );
+        if (!proceed) return;
+      }
+
+      var csrfField = form.querySelector('[name="csrf_token"]');
+      var formData = new FormData();
+      formData.append("csrf_token", csrfField ? csrfField.value : "");
+      formData.append("docx_file", file);
+
+      var originalLabel = insertPdfBtn.innerHTML;
+      insertPdfBtn.disabled = true;
+      insertPdfBtn.textContent = "Importing…";
+
+      fetch("/docx-import", { method: "POST", body: formData })
+        .then(function (res) {
+          return res.json().then(function (data) { return { status: res.status, data: data }; });
+        })
+        .then(function (result) {
+          if (result.status !== 200 || !result.data.ok) {
+            window.alert(result.data.error || "Couldn't import that document.");
+            return;
+          }
+          return importDocxHtml(result.data.html, result.data.images || []);
+        })
+        .catch(function () {
+          window.alert("Couldn't reach the server to import that document — please try again.");
+        })
+        .then(function () {
+          insertPdfBtn.disabled = false;
+          insertPdfBtn.innerHTML = originalLabel;
+        });
     }
 
 
@@ -1816,7 +1929,7 @@
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
           });
           return '<a class="pdf-attachment" href="' + url + '" target="_blank" rel="noopener">' +
-            '<span class="pdf-attachment-icon" aria-hidden="true">PDF</span>' +
+            '<span class="pdf-attachment-icon" aria-hidden="true">' + fileBadgeLabel(name) + '</span>' +
             '<span class="pdf-attachment-name">' + escapedName + '</span>' +
             '<span class="pdf-attachment-cta">Download</span></a>';
         });
