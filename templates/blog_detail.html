@@ -115,7 +115,12 @@
         <form method="post" action="{{ url_for('blog.comment', slug=post.slug) }}" class="comment-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <textarea name="content" rows="3" maxlength="2000" placeholder="Share your thoughts on this story…" required></textarea>
-          <button type="submit" class="btn btn-primary btn-sm">Post comment</button>
+          <div class="comment-form-actions{% if current_user['id'] == post.submitted_by_user_id %} has-owner-edit{% endif %}">
+            {% if current_user['id'] == post.submitted_by_user_id %}
+            <a class="btn btn-outline btn-sm" href="{{ url_for('blog.edit', slug=post.slug) }}">Edit this story</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm">Post comment</button>
+          </div>
         </form>
         {% else %}
         <div class="comment-cta">
@@ -140,12 +145,6 @@
       {% else %}
       <div class="preview-engagement-note">
         <p>Likes, sharing, and comments will be available once this story is live.</p>
-      </div>
-      {% endif %}
-
-      {% if current_user and current_user['id'] == post.submitted_by_user_id %}
-      <div class="post-owner-actions">
-        <a class="btn btn-outline btn-sm" href="{{ url_for('blog.edit', slug=post.slug) }}">Edit this story</a>
       </div>
       {% endif %}
     </div>

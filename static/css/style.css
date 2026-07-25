@@ -459,7 +459,11 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .comments { margin-top: 40px; }
 .comment-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
 .comment-form textarea { resize: vertical; font-family: var(--font-sans); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 12px 14px; font-size: .95rem; }
-.comment-form button { align-self: flex-end; }
+/* Post comment sits at the right; when the story's own submitter is
+   viewing, an Edit link appears on the same line at the left instead of
+   living in its own separate block. */
+.comment-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.comment-form-actions.has-owner-edit { justify-content: space-between; }
 .comment-cta { background: var(--cream-2); border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 26px; font-size: .95rem; }
 .comment-cta a { color: var(--terracotta); font-weight: 600; text-decoration: underline; }
 .comment-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
@@ -469,11 +473,6 @@ p { margin: 0 0 1em; color: var(--ink-soft); }
 .comment-meta strong { color: var(--ink); }
 .comment-body p:last-child { margin-bottom: 0; color: var(--ink-soft); }
 .comment-empty { color: var(--ink-faint); font-style: italic; }
-
-/* Shown only to the story's own submitter, at the very bottom of the
-   article — lets them jump straight to editing without a permanent
-   sidebar card taking up space for everyone else. */
-.post-owner-actions { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--line-soft); }
 
 .post-sidebar { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 96px; }
 .sidebar-card { background: var(--cream-2); border-radius: var(--radius-lg); padding: 22px; }
