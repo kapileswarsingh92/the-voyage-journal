@@ -28,13 +28,19 @@ from PIL import Image, ImageOps
 from .db import get_db
 
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
-# Sized generously for quality (retina-sharp on large screens) while still
-# capping how heavy a single photo/page can get. Anything larger than these
-# is downsized on save. Anything smaller gets AI-upscaled first (see
-# _ai_upscale below) when it's below UPSCALE_MIN_DIMENSION, then capped down
-# to these same limits like everything else.
-COVER_MAX_SIZE = (3000, 1875)
-GALLERY_MAX_SIZE = (2600, 2600)
+# Sized to stay retina-sharp at the largest size each one is actually ever
+# displayed at, while capping how heavy a single photo/page gets. The cover
+# hero is a full-bleed banner up to ~46vh tall — 2400px covers that crisply
+# at 2x pixel density on the vast majority of screens. The lightbox (the
+# biggest an inline gallery photo ever appears) tops out at min(90vw,
+# 1100px), so 2200px covers it at 2x with no visible loss. Anything larger
+# than these is downsized on save; anything smaller gets AI-upscaled first
+# (see _ai_upscale below) when it's below UPSCALE_MIN_DIMENSION, then capped
+# down to these same limits like everything else. (Only affects photos
+# uploaded from now on — existing uploaded photos already on disk keep
+# whatever size they were saved at.)
+COVER_MAX_SIZE = (2400, 1500)
+GALLERY_MAX_SIZE = (2200, 2200)
 MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50MB per photo (cover or gallery) — effectively unlimited for real photos
 MAX_GALLERY_IMAGES = 10
 

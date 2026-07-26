@@ -134,19 +134,39 @@ def plain_excerpt(html_content: str, length: int = 180) -> str:
     return text[:length].rsplit(" ", 1)[0] + "…"
 
 
-def _post_with_counts(row):
-    post = dict(row)
+def _posts_with_counts(rows):
+    """Attach like/comment/gallery counts to a list of post rows using three
+    bulk GROUP BY queries total, rather than three separate COUNT(*) queries
+    per post repeated in a loop — the same total work for one story, but a
+    listing page with a few dozen stories used to run 3N+1 queries just for
+    this; now it's always 4 regardless of how many posts are on the page."""
+    posts = [dict(r) for r in rows]
+    if not posts:
+        return posts
     db = get_db()
-    post["like_count"] = db.execute(
-        "SELECT COUNT(*) FROM likes WHERE post_id = ?", (post["id"],)
-    ).fetchone()[0]
-    post["comment_count"] = db.execute(
-        "SELECT COUNT(*) FROM comments WHERE post_id = ?", (post["id"],)
-    ).fetchone()[0]
-    post["gallery_count"] = db.execute(
-        "SELECT COUNT(*) FROM post_images WHERE post_id = ?", (post["id"],)
-    ).fetchone()[0]
-    return post
+    ids = [p["id"] for p in posts]
+    placeholders = ",".join("?" * len(ids))
+
+    def _count_map(table):
+        counted = db.execute(
+            f"SELECT post_id, COUNT(*) AS n FROM {table} "
+            f"WHERE post_id IN ({placeholders}) GROUP BY post_id",
+            ids,
+        ).fetchall()
+        return {r["post_id"]: r["n"] for r in counted}
+
+    likes = _count_map("likes")
+    comments = _count_map("comments")
+    gallery = _count_map("post_images")
+    for p in posts:
+        p["like_count"] = likes.get(p["id"], 0)
+        p["comment_count"] = comments.get(p["id"], 0)
+        p["gallery_count"] = gallery.get(p["id"], 0)
+    return posts
+
+
+def _post_with_counts(row):
+    return _posts_with_counts([row])[0]
 
 
 @bp.route("/")
@@ -155,7 +175,7 @@ def home():
     approved = db.execute(
         "SELECT * FROM posts WHERE status = 'approved' ORDER BY approved_at DESC, created_at DESC"
     ).fetchall()
-    posts = [_post_with_counts(r) for r in approved]
+    posts = _posts_with_counts(approved)
 
     # Admin-pinned posts always populate the homepage Featured carousel,
     # regardless of how old they are — most recently pinned first. If
@@ -214,7 +234,7 @@ def listing():
     query += " ORDER BY approved_at DESC, created_at DESC"
 
     rows = db.execute(query, params).fetchall()
-    posts = [_post_with_counts(r) for r in rows]
+    posts = _posts_with_counts(rows)
 
     if sort == "liked":
         posts.sort(key=lambda p: p["like_count"], reverse=True)
@@ -305,7 +325,7 @@ def detail(slug):
            ORDER BY approved_at DESC LIMIT 3""",
         (post["category"], post["id"]),
     ).fetchall()
-    related = [_post_with_counts(r) for r in related]
+    related = _posts_with_counts(related)
 
     share_url = request.url_root.rstrip("/") + url_for("blog.detail", slug=slug)
 
@@ -489,7 +509,7 @@ def my_stories():
         "SELECT * FROM posts WHERE submitted_by_user_id = ? ORDER BY created_at DESC",
         (g.user["id"],),
     ).fetchall()
-    posts = [_post_with_counts(r) for r in rows]
+    posts = _posts_with_counts(rows)
     return render_template("my_stories.html", posts=posts)
 
 

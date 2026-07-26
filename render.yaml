@@ -17,7 +17,12 @@ services:
     # REPLICATE_API_TOKEN below) before it's saved, which can take up to
     # ~90s in the worst case (cold-start included) — gunicorn's default
     # 30s worker timeout would kill that request partway through.
-    startCommand: gunicorn run:app --timeout 150
+    # --workers 2: gunicorn defaults to a single worker, which means that
+    # same up-to-90s upscale request would block every other visitor from
+    # being served at all until it finished. Two workers let a second
+    # request through while the first is busy — still comfortably within
+    # the Starter plan's memory for an app this size.
+    startCommand: gunicorn run:app --timeout 150 --workers 2
     envVars:
       - key: SECRET_KEY
         generateValue: true

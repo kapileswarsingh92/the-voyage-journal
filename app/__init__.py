@@ -42,6 +42,15 @@ def create_app(test_config=None):
         MAX_CONTENT_LENGTH=500 * 1024 * 1024,  # up to 50MB per photo, up to 9 photos per story
         SITE=SITE,
         CATEGORIES=CATEGORIES,
+        # Long browser cache for everything under /static — safe because
+        # every reference to a static file in a template goes through
+        # asset_version() below, which appends a "?v=<mtime>" that changes
+        # the moment the file's contents change on disk. A stale cached
+        # copy is never served after a deploy; an unchanged file (most of
+        # them, most of the time) is skipped by the browser entirely
+        # instead of a fresh request (or even just a 304 round-trip) on
+        # every single page view.
+        SEND_FILE_MAX_AGE_DEFAULT=31536000,
     )
 
     if test_config:
@@ -71,6 +80,19 @@ def create_app(test_config=None):
     def _load_user():
         load_logged_in_user()
 
+    def _asset_version(filename):
+        """mtime of a file under static/, used as a cache-busting query
+        string (?v=<mtime>) so style.css/main.js can be cached by the
+        browser for a full year (see SEND_FILE_MAX_AGE_DEFAULT above)
+        without visitors ever seeing a stale copy after a deploy — the
+        version changes the instant the file's contents change, which
+        gives it a brand new URL and forces a fresh download."""
+        path = Path(app.static_folder) / filename
+        try:
+            return int(path.stat().st_mtime)
+        except OSError:
+            return 0
+
     @app.context_processor
     def _inject_globals():
         return {
@@ -78,6 +100,7 @@ def create_app(test_config=None):
             "categories": CATEGORIES,
             "current_user": g.get("user"),
             "csrf_token": csrf_token,
+            "asset_version": _asset_version,
         }
 
     # Serves uploaded photos from UPLOAD_FOLDER (in production, the
@@ -87,12 +110,17 @@ def create_app(test_config=None):
     # into git, always present) if a filename isn't found there — so the
     # seeded demo stories still show their photos even on a brand-new,
     # empty persistent disk.
+    #
+    # max_age is a full year: every uploaded filename is a random token
+    # generated once at upload time (see secrets.token_hex in utils.py) and
+    # never reused for different content, so a given URL's bytes never
+    # change — safe to tell the browser to never even ask again.
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
         upload_dir = Path(app.config["UPLOAD_FOLDER"])
         if (upload_dir / filename).is_file():
-            return send_from_directory(upload_dir, filename)
-        return send_from_directory(Path(app.static_folder) / "uploads", filename)
+            return send_from_directory(upload_dir, filename, max_age=31536000)
+        return send_from_directory(Path(app.static_folder) / "uploads", filename, max_age=31536000)
 
     @app.errorhandler(404)
     def not_found(e):
