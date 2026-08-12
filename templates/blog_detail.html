@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ post.title }} — {{ site.name }}{% endblock %}
 {% block body_class %}page-detail{% endblock %}
+{% block page_description %}{{ post.excerpt or site.description }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{% if post.cover_image %}{{ request.url_root.rstrip('/') }}{{ url_for('uploaded_file', filename=post.cover_image) }}{% else %}{{ super() }}{% endif %}{% endblock %}
 
 {% block content %}
 {% if preview %}

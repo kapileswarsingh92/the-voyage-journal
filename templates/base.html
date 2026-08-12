@@ -4,8 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}{{ site.name }} — {{ site.tagline }}{% endblock %}</title>
-<meta name="description" content="{{ site.description }}">
+<meta name="description" content="{% block page_description %}{{ site.description }}{% endblock %}">
+<link rel="canonical" href="{{ request.url }}">
 <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+
+<!-- Open Graph / Twitter Card — controls how a shared link looks when
+     pasted into WhatsApp, iMessage, Facebook, X, etc. Individual pages
+     (blog_detail.html in particular) override og_title/og_image/og_type
+     via block inheritance; self.___() below reuses that same rendered
+     content for the Twitter tags instead of duplicating it. -->
+<meta property="og:site_name" content="{{ site.name }}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+<meta property="og:description" content="{{ self.page_description() }}">
+<meta property="og:image" content="{% block og_image %}{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='img/hero.jpg') }}{% endblock %}">
+<meta property="og:url" content="{{ request.url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ self.og_title() }}">
+<meta name="twitter:description" content="{{ self.page_description() }}">
+<meta name="twitter:image" content="{{ self.og_image() }}">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">

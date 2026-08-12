@@ -4,6 +4,7 @@ import re
 import markdown as md
 from flask import (
     Blueprint,
+    Response,
     abort,
     current_app,
     flash,
@@ -651,3 +652,52 @@ def edit(slug):
 @bp.route("/about")
 def about():
     return render_template("about.html")
+
+
+@bp.route("/robots.txt")
+def robots_txt():
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        f"Sitemap: {request.url_root.rstrip('/')}{url_for('blog.sitemap_xml')}",
+    ]
+    return Response("\n".join(lines) + "\n", mimetype="text/plain")
+
+
+@bp.route("/sitemap.xml")
+def sitemap_xml():
+    db = get_db()
+    root = request.url_root.rstrip("/")
+
+    # Static pages get a modest, hand-picked priority/changefreq. Story
+    # pages (the bulk of the sitemap, and the content actually worth a
+    # search engine re-crawling) are generated below from the approved
+    # posts table, newest first, using each story's approval date (or
+    # submission date, for the rare row missing one) as its <lastmod>.
+    entries = [
+        (url_for("blog.home"), "1.0", "daily", None),
+        (url_for("blog.listing"), "0.8", "daily", None),
+        (url_for("blog.about"), "0.3", "monthly", None),
+        (url_for("blog.submit"), "0.5", "monthly", None),
+    ]
+
+    posts = db.execute(
+        """SELECT slug, approved_at, created_at FROM posts
+           WHERE status = 'approved' ORDER BY approved_at DESC, created_at DESC"""
+    ).fetchall()
+    for p in posts:
+        lastmod = (p["approved_at"] or p["created_at"] or "")[:10] or None
+        entries.append((url_for("blog.detail", slug=p["slug"]), "0.7", "weekly", lastmod))
+
+    parts = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for path, priority, changefreq, lastmod in entries:
+        parts.append("  <url>")
+        parts.append(f"    <loc>{root}{path}</loc>")
+        if lastmod:
+            parts.append(f"    <lastmod>{lastmod}</lastmod>")
+        parts.append(f"    <changefreq>{changefreq}</changefreq>")
+        parts.append(f"    <priority>{priority}</priority>")
+        parts.append("  </url>")
+    parts.append("</urlset>")
+
+    return Response("\n".join(parts), mimetype="application/xml")
