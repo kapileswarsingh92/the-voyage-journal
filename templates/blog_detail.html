@@ -4,6 +4,24 @@
 {% block page_description %}{{ post.excerpt or site.description }}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block og_image %}{% if post.cover_image %}{{ request.url_root.rstrip('/') }}{{ url_for('uploaded_file', filename=post.cover_image) }}{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block structured_data %}
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": {{ post.title | tojson }},
+  "image": [{{ self.og_image() | tojson }}],
+  "datePublished": {{ (post.approved_at or post.created_at)[:10] | tojson }},
+  "dateModified": {{ (post.approved_at or post.created_at)[:10] | tojson }},
+  "author": {"@type": "Person", "name": {{ post.author_name | tojson }}},
+  "publisher": {
+    "@type": "Organization",
+    "name": {{ site.name | tojson }},
+    "logo": {"@type": "ImageObject", "url": {{ (request.url_root.rstrip('/') + url_for('static', filename='img/favicon.svg')) | tojson }}}
+  },
+  "description": {{ (post.excerpt or site.description) | tojson }},
+  "mainEntityOfPage": {"@type": "WebPage", "@id": {{ request.url | tojson }}}
+}
+{% endblock %}
 
 {% block content %}
 {% if preview %}
@@ -40,7 +58,8 @@
 <article id="top">
   <header class="post-header">
     {% if post.cover_image %}
-    <div class="post-header-media" style="background-image:url('{{ url_for('uploaded_file', filename=post.cover_image) }}')"></div>
+    <img class="post-header-media" src="{{ url_for('uploaded_file', filename=post.cover_image) }}"
+         alt="{{ post.title }}{% if post.location %} — {{ post.location }}{% endif %}">
     <div class="post-header-scrim"></div>
     {% endif %}
     <div class="wrap post-header-inner">

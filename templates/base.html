@@ -24,6 +24,23 @@
 <meta name="twitter:description" content="{{ self.page_description() }}">
 <meta name="twitter:image" content="{{ self.og_image() }}">
 
+<!-- Structured data (schema.org) — helps Google understand what a page
+     actually is (an article, a site) rather than just crawling raw text,
+     and is a prerequisite for things like article rich results/sitelinks
+     search box. blog_detail.html replaces this whole block with a more
+     specific Article schema for individual stories. -->
+<script type="application/ld+json">
+{% block structured_data %}
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": {{ site.name | tojson }},
+  "description": {{ site.description | tojson }},
+  "url": {{ request.url_root | tojson }}
+}
+{% endblock %}
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Poppins:wght@300;400;500;600;700&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
